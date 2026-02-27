@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简单JavaScript计数器示例</title>
+    <script src="counter.js" defer></script>
+    <script src="utils.js" defer></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            padding: 20px;
+        }
+        
+        .container {
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        .description {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            text-align: left;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #2575fc;
+        }
+        
+        .counter-display {
+            font-size: 72px;
+            font-weight: bold;
+            color: #2575fc;
+            margin: 30px 0;
+            padding: 20px;
+            background-color: #f0f8ff;
+            border-radius: 10px;
+            min-height: 120px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 15px 25px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+        
+        #increment-btn {
+            background-color: #4CAF50;
+            color: white;
+            flex: 1;
+        }
+        
+        #decrement-btn {
+            background-color: #f44336;
+            color: white;
+            flex: 1;
+        }
+        
+        #reset-btn {
+            background-color: #ff9800;
+            color: white;
+            flex: 2;
+            min-width: 100%;
+        }
+        
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        button:active {
+            transform: translateY(1px);
+        }
+        
+        .history {
+            margin-top: 30px;
+            text-align: left;
+        }
+        
+        .history h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        #history-list {
+            list-style-type: none;
+            max-height: 150px;
+            overflow-y: auto;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+        }
+        
+        #history-list li {
+            padding: 8px 10px;
+            margin-bottom: 5px;
+            background-color: white;
+            border-radius: 4px;
+            border-left: 3px solid #2575fc;
+        }
+        
+        .code-example {
+            margin-top: 30px;
+            background-color: #f5f5f5;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: left;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            border: 1px solid #ddd;
+        }
+        
+        .code-example h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .footer {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>简单JavaScript计数器</h1>
+        
+        <div class="description">
+            <p>这是一个简单的JavaScript示例，展示了JavaScript如何：</p>
+            <ol>
+                <li>响应按钮点击事件</li>
+                <li>动态更新网页内容</li>
+                <li>存储和跟踪数据变化</li>
+                <li>根据条件改变元素样式</li>
+            </ol>
+            <p>点击下面的按钮查看效果！</p>
+        </div>
+        
+        <div class="counter-display" id="counter">0</div>
+        
+        <div class="buttons">
+            <button id="increment-btn">增加 (+1)</button>
+            <button id="decrement-btn">减少 (-1)</button>
+            <button id="reset-btn">重置计数器</button>
+        </div>
+        
+        <div class="history">
+            <h3>操作历史:</h3>
+            <ul id="history-list">
+                <!-- JavaScript会在这里添加历史记录 -->
+            </ul>
+        </div>
+        
+        <div class="code-example">
+            <h3>主要JavaScript代码:</h3>
+            <pre>
+// 1. 获取HTML元素
+const counterElement = document.getElementById('counter');
+const incrementBtn = document.getElementById('increment-btn');
+const decrementBtn = document.getElementById('decrement-btn');
+const resetBtn = document.getElementById('reset-btn');
+const historyList = document.getElementById('history-list');
+
+// 2. 初始化计数器
+let count = 0;
+let history = [];
+
+// 3. 更新显示的函数
+function updateDisplay() {
+    counterElement.textContent = count;
+    
+    // 根据数值改变颜色
+    if (count > 0) {
+        counterElement.style.color = '#4CAF50'; // 绿色
+    } else if (count < 0) {
+        counterElement.style.color = '#f44336'; // 红色
+    } else {
+        counterElement.style.color = '#2575fc'; // 蓝色
+    }
+}
+
+// 4. 添加历史记录
+function addHistory(action) {
+    const timestamp = new Date().toLocaleTimeString();
+    const historyItem = document.createElement('li');
+    historyItem.textContent = `${timestamp}: ${action} -> 当前值: ${count}`;
+    historyList.prepend(historyItem); // 添加到列表顶部
+    
+    // 保持最多10条历史记录
+    if (historyList.children.length > 10) {
+        historyList.removeChild(historyList.lastChild);
+    }
+}
+
+// 5. 为按钮添加事件监听器
+incrementBtn.addEventListener('click', function() {
+    count++;
+    updateDisplay();
+    addHistory('增加了1');
+});
+
+decrementBtn.addEventListener('click', function() {
+    count--;
+    updateDisplay();
+    addHistory('减少了1');
+});
+
+resetBtn.addEventListener('click', function() {
+    count = 0;
+    updateDisplay();
+    addHistory('重置为0');
+});
+
+// 6. 初始显示
+updateDisplay();
+addHistory('初始值为0');
+            </pre>
+        </div>
+        
+        <div class="footer">
+            <p>此示例把JavaScript放在独立文件 <code>counter.js</code> 中。只要保持HTML和JS在同一文件夹，直接用浏览器打开HTML即可运行。</p>
+        </div>
+    </div>
+</body>
+</html>
