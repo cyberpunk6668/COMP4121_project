@@ -19,5 +19,5 @@ information gained from the Internet to generate the reasonable and timely
 investment plan for the retail investor
 
 3. ### Company & Viability
-
+this part is need to talk about the business model base on what plan you want to implement 
 
