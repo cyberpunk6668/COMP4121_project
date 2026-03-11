@@ -1,3 +1,5 @@
+export type UserRole = 'customer' | 'engineer' | 'admin';
+
 export interface DeviceType {
   id: number;
   name: string;
@@ -29,6 +31,16 @@ export interface Engineer {
   avatar: string;
 }
 
+export interface AuthUser {
+  id: number;
+  phone: string;
+  nickname: string;
+  role: UserRole;
+  status: 'active' | 'disabled';
+  createdAt: string;
+  engineerProfile?: Engineer;
+}
+
 export type OrderStatus =
   | '待支付'
   | '待分配'
@@ -37,6 +49,9 @@ export type OrderStatus =
   | '待评价'
   | '已完成'
   | '已取消';
+
+export type PaymentStatus = '待支付' | '已支付' | '支付失败';
+export type PaymentMode = 'live' | 'mock';
 
 export interface Order {
   id: number;
@@ -51,9 +66,19 @@ export interface Order {
   appointmentTime: string;
   totalAmount: number;
   paymentMethod: string;
-  paymentStatus: string;
+  paymentStatus: PaymentStatus;
   status: OrderStatus;
   createdAt: string;
+  transactionId?: string;
+  paidAt?: string;
+  paymentQrCode?: string;
+}
+
+export interface PaymentReadiness {
+  enabled: boolean;
+  configured: boolean;
+  message: string;
+  mode: PaymentMode;
 }
 
 export interface Review {

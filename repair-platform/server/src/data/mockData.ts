@@ -1,8 +1,28 @@
+import { createHash } from 'crypto';
+
+export type UserRole = 'customer' | 'engineer' | 'admin';
+export type UserStatus = 'active' | 'disabled';
+export type OrderPaymentStatus = '待支付' | '已支付' | '支付失败';
+export type OrderStatus = '待支付' | '待分配' | '待上门' | '服务中' | '待评价' | '已完成' | '已取消';
+
 export interface User {
   id: number;
   phone: string;
   nickname: string;
-  role: 'user' | 'engineer' | 'admin';
+  role: UserRole;
+  passwordHash: string;
+  status: UserStatus;
+  createdAt: string;
+}
+
+export interface PublicUser {
+  id: number;
+  phone: string;
+  nickname: string;
+  role: UserRole;
+  status: UserStatus;
+  createdAt: string;
+  engineerProfile?: Engineer;
 }
 
 export interface DeviceType {
@@ -49,15 +69,70 @@ export interface Order {
   appointmentTime: string;
   totalAmount: number;
   paymentMethod: string;
-  paymentStatus: '待支付' | '已支付';
-  status: '待支付' | '待分配' | '待上门' | '服务中' | '待评价' | '已完成' | '已取消';
+  paymentStatus: OrderPaymentStatus;
+  status: OrderStatus;
   createdAt: string;
+  transactionId?: string;
+  paidAt?: string;
+  paymentQrCode?: string;
+}
+
+interface CreateUserInput {
+  phone: string;
+  nickname: string;
+  password: string;
+  role: Exclude<UserRole, 'admin'>;
+}
+
+interface CreateEngineerInput {
+  userId: number;
+  realName: string;
+  skillDesc: string;
+  serviceArea: string;
+}
+
+const AUTH_SALT = 'repair-platform-demo-salt';
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+export function hashPassword(password: string) {
+  return createHash('sha256').update(`${password}:${AUTH_SALT}`).digest('hex');
+}
+
+export function verifyPassword(password: string, passwordHash: string) {
+  return hashPassword(password) === passwordHash;
 }
 
 export const users: User[] = [
-  { id: 1, phone: '13800000000', nickname: '演示用户', role: 'user' },
-  { id: 2, phone: '13900000000', nickname: '工程师账号', role: 'engineer' },
-  { id: 3, phone: '13700000000', nickname: '管理员', role: 'admin' }
+  {
+    id: 1,
+    phone: '13800000000',
+    nickname: '演示客户',
+    role: 'customer',
+    passwordHash: hashPassword('demo123'),
+    status: 'active',
+    createdAt: '2026-03-01T09:00:00.000Z'
+  },
+  {
+    id: 2,
+    phone: '13900000000',
+    nickname: '工程师账号',
+    role: 'engineer',
+    passwordHash: hashPassword('demo123'),
+    status: 'active',
+    createdAt: '2026-03-01T10:00:00.000Z'
+  },
+  {
+    id: 3,
+    phone: '13700000000',
+    nickname: '管理员',
+    role: 'admin',
+    passwordHash: hashPassword('admin123'),
+    status: 'active',
+    createdAt: '2026-03-01T11:00:00.000Z'
+  }
 ];
 
 export const deviceTypes: DeviceType[] = [
@@ -125,17 +200,6 @@ export const engineers: Engineer[] = [
     totalOrders: 860,
     status: 1,
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80'
-  },
-  {
-    id: 2,
-    userId: 4,
-    realName: '刘工',
-    skillDesc: '电脑清灰、系统重装、硬件更换',
-    serviceArea: 'Chatswood / North Sydney',
-    avgRating: 4.8,
-    totalOrders: 620,
-    status: 1,
-    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80'
   }
 ];
 
@@ -155,7 +219,9 @@ export const orders: Order[] = [
     paymentMethod: '微信支付',
     paymentStatus: '已支付',
     status: '待上门',
-    createdAt: '2026-03-11 09:00:00'
+    createdAt: '2026-03-11T09:00:00.000Z',
+    transactionId: '420000202603110001',
+    paidAt: '2026-03-11T09:05:00.000Z'
   },
   {
     id: 2,
@@ -169,29 +235,71 @@ export const orders: Order[] = [
     address: 'North Sydney Miller St 66 号',
     appointmentTime: '2026-03-13 10:00-12:00',
     totalAmount: 199,
-    paymentMethod: '支付宝',
-    paymentStatus: '已支付',
-    status: '待分配',
-    createdAt: '2026-03-11 10:30:00'
-  },
-  {
-    id: 3,
-    orderNo: 'RP202603110003',
-    userId: 1,
-    engineerId: 2,
-    deviceTypeId: 3,
-    repairItemId: 4,
-    deviceModel: 'iPad Air',
-    problemDesc: '续航下降严重，使用一小时自动关机。',
-    address: 'Chatswood Victoria Ave 5 号',
-    appointmentTime: '2026-03-10 13:00-15:00',
-    totalAmount: 259,
-    paymentMethod: '银行卡',
-    paymentStatus: '已支付',
-    status: '待评价',
-    createdAt: '2026-03-09 18:20:00'
+    paymentMethod: '微信支付',
+    paymentStatus: '待支付',
+    status: '待支付',
+    createdAt: '2026-03-11T10:30:00.000Z'
   }
 ];
+
+export function sanitizeUser(user: User): PublicUser {
+  const engineerProfile = getEngineerByUserId(user.id);
+  return {
+    id: user.id,
+    phone: user.phone,
+    nickname: user.nickname,
+    role: user.role,
+    status: user.status,
+    createdAt: user.createdAt,
+    engineerProfile
+  };
+}
+
+export function getUserById(id: number) {
+  return users.find((user) => user.id === id);
+}
+
+export function getUserByPhone(phone: string) {
+  return users.find((user) => user.phone === phone);
+}
+
+export function getEngineerByUserId(userId: number) {
+  return engineers.find((engineer) => engineer.userId === userId);
+}
+
+export function getEngineerById(id: number) {
+  return engineers.find((engineer) => engineer.id === id);
+}
+
+export function createUser(input: CreateUserInput) {
+  const user: User = {
+    id: users.length + 1,
+    phone: input.phone,
+    nickname: input.nickname,
+    role: input.role,
+    passwordHash: hashPassword(input.password),
+    status: 'active',
+    createdAt: nowIso()
+  };
+  users.push(user);
+  return user;
+}
+
+export function createEngineerProfile(input: CreateEngineerInput) {
+  const engineer: Engineer = {
+    id: engineers.length + 1,
+    userId: input.userId,
+    realName: input.realName,
+    skillDesc: input.skillDesc,
+    serviceArea: input.serviceArea,
+    avgRating: 5,
+    totalOrders: 0,
+    status: 0,
+    avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=400&q=80'
+  };
+  engineers.push(engineer);
+  return engineer;
+}
 
 export function generateOrderNo() {
   return `RP${Date.now()}${Math.floor(Math.random() * 90 + 10)}`;
@@ -203,4 +311,71 @@ export function getRepairItemById(id: number) {
 
 export function getOrderById(id: number) {
   return orders.find((order) => order.id === id);
+}
+
+export function getOrderByOrderNo(orderNo: string) {
+  return orders.find((order) => order.orderNo === orderNo);
+}
+
+export function getOrdersForUser(user: User) {
+  if (user.role === 'admin') {
+    return orders.slice().sort((a, b) => b.id - a.id);
+  }
+
+  if (user.role === 'engineer') {
+    const engineer = getEngineerByUserId(user.id);
+    return orders
+      .filter((order) => order.engineerId === engineer?.id || order.status === '待分配')
+      .sort((a, b) => b.id - a.id);
+  }
+
+  return orders.filter((order) => order.userId === user.id).sort((a, b) => b.id - a.id);
+}
+
+export function createOrder(input: Omit<Order, 'id' | 'orderNo' | 'createdAt'>) {
+  const order: Order = {
+    ...input,
+    id: orders.length + 1,
+    orderNo: generateOrderNo(),
+    createdAt: nowIso()
+  };
+  orders.unshift(order);
+  return order;
+}
+
+export function canAccessOrder(user: User, order: Order) {
+  if (user.role === 'admin') {
+    return true;
+  }
+
+  if (user.role === 'customer') {
+    return order.userId === user.id;
+  }
+
+  const engineer = getEngineerByUserId(user.id);
+  return order.engineerId === engineer?.id || order.status === '待分配';
+}
+
+export function markOrderAsPendingPayment(order: Order, paymentMethod: string) {
+  order.paymentMethod = paymentMethod;
+  order.paymentStatus = '待支付';
+  order.status = '待支付';
+  order.transactionId = undefined;
+  order.paidAt = undefined;
+}
+
+export function markOrderAsPaid(order: Order, transactionId?: string, paidAt?: string) {
+  order.paymentStatus = '已支付';
+  order.status = '待分配';
+  order.transactionId = transactionId;
+  order.paidAt = paidAt ?? nowIso();
+}
+
+export function markOrderPaymentFailed(order: Order) {
+  order.paymentStatus = '支付失败';
+  order.status = '待支付';
+}
+
+export function setOrderPaymentQrCode(order: Order, codeUrl: string) {
+  order.paymentQrCode = codeUrl;
 }

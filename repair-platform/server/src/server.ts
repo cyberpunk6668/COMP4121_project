@@ -1,19 +1,51 @@
 import cors from 'cors';
 import dotenv from 'dotenv';
-import express, { Request, Response } from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import {
+  canAccessOrder,
+  createEngineerProfile,
+  createOrder,
+  createUser,
   deviceTypes,
   engineers,
-  generateOrderNo,
+  getEngineerById,
+  getEngineerByUserId,
   getOrderById,
+  getOrderByOrderNo,
+  getOrdersForUser,
   getRepairItemById,
+  getUserById,
+  getUserByPhone,
+  markOrderAsPaid,
+  markOrderAsPendingPayment,
+  markOrderPaymentFailed,
   orders,
   repairItems,
-  users
+  sanitizeUser,
+  setOrderPaymentQrCode,
+  User,
+  UserRole,
+  users,
+  verifyPassword
 } from './data/mockData';
+import {
+  createNativeWechatPayment,
+  getWechatPayReadiness,
+  parseWechatPayNotification,
+  queryWechatPaymentByOrderNo
+} from './services/wechatPay';
 
 dotenv.config();
+
+type RawBodyRequest = Request & { rawBody?: string; authUser?: User };
+
+type TokenPayload = {
+  userId: number;
+  role: UserRole;
+  iat: number;
+  exp: number;
+};
 
 const app = express();
 const PORT = Number(process.env.PORT || 4000);
@@ -21,28 +53,139 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 const JWT_SECRET = process.env.JWT_SECRET || 'replace-with-a-secure-secret';
 
 app.use(cors({ origin: CLIENT_URL, credentials: true }));
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, _res, buffer) => {
+      (req as RawBodyRequest).rawBody = buffer.toString('utf8');
+    }
+  })
+);
+
+function issueToken(user: User) {
+  return jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+}
+
+function readBearerToken(req: Request) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) {
+    return null;
+  }
+  return header.slice('Bearer '.length);
+}
+
+function requireAuth(roles?: UserRole[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const token = readBearerToken(req);
+    if (!token) {
+      return res.status(401).json({ success: false, message: 'Authentication required.' });
+    }
+
+    try {
+      const payload = jwt.verify(token, JWT_SECRET) as TokenPayload;
+      const user = getUserById(payload.userId);
+      if (!user || user.status !== 'active') {
+        return res.status(401).json({ success: false, message: 'User session is invalid.' });
+      }
+
+      if (roles && !roles.includes(user.role)) {
+        return res.status(403).json({ success: false, message: 'You do not have permission for this action.' });
+      }
+
+      (req as RawBodyRequest).authUser = user;
+      return next();
+    } catch {
+      return res.status(401).json({ success: false, message: 'Invalid or expired token.' });
+    }
+  };
+}
+
+function getPaymentMode() {
+  const configuredProvider = (process.env.PAYMENT_PROVIDER || 'mock').trim();
+  const readiness = getWechatPayReadiness();
+  const mode = configuredProvider === 'wechat-native' && readiness.configured ? 'live' : 'mock';
+  return { mode, readiness };
+}
+
+function buildMockWechatCodeUrl(orderNo: string) {
+  return `weixin://wxpay/mock/${orderNo}`;
+}
 
 app.get('/api/health', (_req: Request, res: Response) => {
-  res.json({ success: true, message: 'Repair platform API is running.' });
+  const { mode } = getPaymentMode();
+  res.json({ success: true, message: 'Repair platform API is running.', data: { paymentMode: mode } });
 });
 
-app.post('/api/auth/login', (req: Request, res: Response) => {
-  const { phone } = req.body as { phone?: string };
-  const user = users.find((item) => item.phone === phone) ?? users[0];
-  const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-
+app.get('/api/auth/demo-accounts', (_req: Request, res: Response) => {
   res.json({
     success: true,
-    data: {
-      token,
-      user
-    }
+    data: [
+      { role: 'customer', phone: '13800000000', password: 'demo123' },
+      { role: 'engineer', phone: '13900000000', password: 'demo123' },
+      { role: 'admin', phone: '13700000000', password: 'admin123' }
+    ]
   });
 });
 
-app.get('/api/auth/profile', (_req: Request, res: Response) => {
-  res.json({ success: true, data: users[0] });
+app.post('/api/auth/register', (req: Request, res: Response) => {
+  const { phone, password, nickname, role, realName, skillDesc, serviceArea } = req.body as {
+    phone?: string;
+    password?: string;
+    nickname?: string;
+    role?: UserRole;
+    realName?: string;
+    skillDesc?: string;
+    serviceArea?: string;
+  };
+
+  if (!phone || !password || !nickname || !role) {
+    return res.status(400).json({ success: false, message: 'Phone, password, nickname, and role are required.' });
+  }
+
+  if (!['customer', 'engineer'].includes(role)) {
+    return res.status(400).json({ success: false, message: 'Role must be customer or engineer.' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long.' });
+  }
+
+  if (getUserByPhone(phone)) {
+    return res.status(409).json({ success: false, message: 'This phone number has already been registered.' });
+  }
+
+  const user = createUser({ phone, password, nickname, role: role as 'customer' | 'engineer' });
+
+  if (role === 'engineer') {
+    createEngineerProfile({
+      userId: user.id,
+      realName: realName || nickname,
+      skillDesc: skillDesc || '新入驻工程师，等待完善技能简介。',
+      serviceArea: serviceArea || '待设置服务区域'
+    });
+  }
+
+  const token = issueToken(user);
+  return res.status(201).json({ success: true, data: { token, user: sanitizeUser(user) } });
+});
+
+app.post('/api/auth/login', (req: Request, res: Response) => {
+  const { phone, password } = req.body as { phone?: string; password?: string };
+  if (!phone || !password) {
+    return res.status(400).json({ success: false, message: 'Phone and password are required.' });
+  }
+
+  const user = getUserByPhone(phone);
+  if (!user || !verifyPassword(password, user.passwordHash)) {
+    return res.status(401).json({ success: false, message: 'Phone or password is incorrect.' });
+  }
+
+  const token = issueToken(user);
+  return res.json({ success: true, data: { token, user: sanitizeUser(user) } });
+});
+
+app.get('/api/auth/profile', requireAuth(), (req: Request, res: Response) => {
+  const currentUser = (req as RawBodyRequest).authUser!;
+  return res.json({ success: true, data: sanitizeUser(currentUser) });
 });
 
 app.get('/api/device-types', (_req: Request, res: Response) => {
@@ -62,33 +205,34 @@ app.get('/api/repair-items', (_req: Request, res: Response) => {
 app.get('/api/repair-items/:id', (req: Request, res: Response) => {
   const item = getRepairItemById(Number(req.params.id));
   if (!item) {
-    return res.status(404).json({ success: false, message: 'Repair item not found' });
+    return res.status(404).json({ success: false, message: 'Repair item not found.' });
   }
   return res.json({ success: true, data: item });
 });
 
-app.get('/api/orders', (_req: Request, res: Response) => {
-  res.json({ success: true, data: orders.slice().sort((a, b) => b.id - a.id) });
+app.get('/api/orders', requireAuth(), (req: Request, res: Response) => {
+  const currentUser = (req as RawBodyRequest).authUser!;
+  res.json({ success: true, data: getOrdersForUser(currentUser) });
 });
 
-app.get('/api/orders/:id', (req: Request, res: Response) => {
+app.get('/api/orders/:id', requireAuth(), (req: Request, res: Response) => {
+  const currentUser = (req as RawBodyRequest).authUser!;
   const order = getOrderById(Number(req.params.id));
+
   if (!order) {
-    return res.status(404).json({ success: false, message: 'Order not found' });
+    return res.status(404).json({ success: false, message: 'Order not found.' });
   }
+
+  if (!canAccessOrder(currentUser, order)) {
+    return res.status(403).json({ success: false, message: 'You cannot access this order.' });
+  }
+
   return res.json({ success: true, data: order });
 });
 
-app.post('/api/orders', (req: Request, res: Response) => {
-  const {
-    deviceTypeId,
-    repairItemId,
-    deviceModel,
-    problemDesc,
-    address,
-    appointmentTime,
-    paymentMethod
-  } = req.body as {
+app.post('/api/orders', requireAuth(['customer', 'admin']), (req: Request, res: Response) => {
+  const currentUser = (req as RawBodyRequest).authUser!;
+  const { deviceTypeId, repairItemId, deviceModel, problemDesc, address, appointmentTime, paymentMethod } = req.body as {
     deviceTypeId?: number;
     repairItemId?: number;
     deviceModel?: string;
@@ -99,18 +243,16 @@ app.post('/api/orders', (req: Request, res: Response) => {
   };
 
   if (!deviceTypeId || !repairItemId || !deviceModel || !problemDesc || !address || !appointmentTime || !paymentMethod) {
-    return res.status(400).json({ success: false, message: 'Missing required fields' });
+    return res.status(400).json({ success: false, message: 'Missing required fields.' });
   }
 
-  const item = getRepairItemById(Number(repairItemId));
-  if (!item) {
-    return res.status(404).json({ success: false, message: 'Repair item not found' });
+  const repairItem = getRepairItemById(Number(repairItemId));
+  if (!repairItem) {
+    return res.status(404).json({ success: false, message: 'Repair item not found.' });
   }
 
-  const order = {
-    id: orders.length + 1,
-    orderNo: generateOrderNo(),
-    userId: 1,
+  const order = createOrder({
+    userId: currentUser.id,
     engineerId: null,
     deviceTypeId: Number(deviceTypeId),
     repairItemId: Number(repairItemId),
@@ -118,90 +260,268 @@ app.post('/api/orders', (req: Request, res: Response) => {
     problemDesc,
     address,
     appointmentTime,
-    totalAmount: item.price,
+    totalAmount: repairItem.price,
     paymentMethod,
-    paymentStatus: '已支付' as const,
-    status: '待分配' as const,
-    createdAt: new Date().toISOString()
-  };
+    paymentStatus: '待支付',
+    status: '待支付'
+  });
 
-  orders.unshift(order);
+  if (paymentMethod === '微信支付') {
+    markOrderAsPendingPayment(order, paymentMethod);
+  } else {
+    markOrderAsPaid(order, `offline-${order.orderNo}`);
+  }
+
   return res.status(201).json({ success: true, data: order });
 });
 
-app.put('/api/orders/:id/cancel', (req: Request, res: Response) => {
+app.put('/api/orders/:id/cancel', requireAuth(), (req: Request, res: Response) => {
+  const currentUser = (req as RawBodyRequest).authUser!;
   const order = getOrderById(Number(req.params.id));
   if (!order) {
-    return res.status(404).json({ success: false, message: 'Order not found' });
+    return res.status(404).json({ success: false, message: 'Order not found.' });
   }
+
+  if (!canAccessOrder(currentUser, order)) {
+    return res.status(403).json({ success: false, message: 'You cannot cancel this order.' });
+  }
+
   order.status = '已取消';
-  res.json({ success: true, data: order });
+  return res.json({ success: true, data: order });
 });
 
-app.post('/api/orders/:id/review', (req: Request, res: Response) => {
+app.post('/api/orders/:id/review', requireAuth(['customer', 'admin']), (req: Request, res: Response) => {
+  const currentUser = (req as RawBodyRequest).authUser!;
   const order = getOrderById(Number(req.params.id));
   if (!order) {
-    return res.status(404).json({ success: false, message: 'Order not found' });
+    return res.status(404).json({ success: false, message: 'Order not found.' });
   }
+
+  if (!canAccessOrder(currentUser, order)) {
+    return res.status(403).json({ success: false, message: 'You cannot review this order.' });
+  }
+
   order.status = '已完成';
-  res.json({ success: true, data: { order, review: req.body } });
+  return res.json({ success: true, data: { order, review: req.body } });
+});
+
+app.get('/api/payments/wechat/readiness', requireAuth(), (_req: Request, res: Response) => {
+  const { mode, readiness } = getPaymentMode();
+  res.json({ success: true, data: { ...readiness, mode } });
+});
+
+app.post('/api/payments/wechat/native/:orderId', requireAuth(['customer', 'admin']), async (req: Request, res: Response) => {
+  const currentUser = (req as RawBodyRequest).authUser!;
+  const order = getOrderById(Number(req.params.orderId));
+  if (!order) {
+    return res.status(404).json({ success: false, message: 'Order not found.' });
+  }
+
+  if (!canAccessOrder(currentUser, order)) {
+    return res.status(403).json({ success: false, message: 'You cannot pay this order.' });
+  }
+
+  if (order.paymentMethod !== '微信支付') {
+    return res.status(400).json({ success: false, message: 'This order is not using WeChat Pay.' });
+  }
+
+  if (order.paymentStatus === '已支付') {
+    return res.json({
+      success: true,
+      data: {
+        order,
+        codeUrl: order.paymentQrCode,
+        paymentMode: getPaymentMode().mode,
+        canMockConfirm: false
+      }
+    });
+  }
+
+  const { mode, readiness } = getPaymentMode();
+
+  try {
+    const codeUrl =
+      mode === 'live'
+        ? (await createNativeWechatPayment(order)).code_url
+        : order.paymentQrCode || buildMockWechatCodeUrl(order.orderNo);
+
+    setOrderPaymentQrCode(order, codeUrl);
+
+    return res.json({
+      success: true,
+      data: {
+        order,
+        codeUrl,
+        paymentMode: mode,
+        canMockConfirm: mode === 'mock',
+        readiness
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : 'Failed to create WeChat payment.'
+    });
+  }
+});
+
+app.post('/api/payments/wechat/confirm/:orderId', requireAuth(['customer', 'admin']), (req: Request, res: Response) => {
+  const currentUser = (req as RawBodyRequest).authUser!;
+  const order = getOrderById(Number(req.params.orderId));
+  if (!order) {
+    return res.status(404).json({ success: false, message: 'Order not found.' });
+  }
+
+  if (!canAccessOrder(currentUser, order)) {
+    return res.status(403).json({ success: false, message: 'You cannot pay this order.' });
+  }
+
+  const { mode } = getPaymentMode();
+  if (mode !== 'mock') {
+    return res.status(400).json({ success: false, message: 'Mock payment confirmation is only available in mock mode.' });
+  }
+
+  markOrderAsPaid(order, `mock-${order.orderNo}`);
+  return res.json({ success: true, data: order });
+});
+
+app.get('/api/payments/wechat/status/:orderId', requireAuth(), async (req: Request, res: Response) => {
+  const currentUser = (req as RawBodyRequest).authUser!;
+  const order = getOrderById(Number(req.params.orderId));
+  if (!order) {
+    return res.status(404).json({ success: false, message: 'Order not found.' });
+  }
+
+  if (!canAccessOrder(currentUser, order)) {
+    return res.status(403).json({ success: false, message: 'You cannot access this payment.' });
+  }
+
+  const { mode, readiness } = getPaymentMode();
+
+  if (mode === 'live' && order.paymentMethod === '微信支付' && order.paymentStatus !== '已支付') {
+    try {
+      const transaction = await queryWechatPaymentByOrderNo(order.orderNo);
+      if (transaction.trade_state === 'SUCCESS') {
+        markOrderAsPaid(order, transaction.transaction_id, transaction.success_time);
+      } else if (transaction.trade_state === 'PAYERROR') {
+        markOrderPaymentFailed(order);
+      }
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to query WeChat payment status.'
+      });
+    }
+  }
+
+  return res.json({ success: true, data: { order, paymentMode: mode, readiness } });
+});
+
+app.post('/api/payments/wechat/notify', (req: Request, res: Response) => {
+  const rawBody = (req as RawBodyRequest).rawBody ?? '';
+
+  try {
+    const notification = parseWechatPayNotification(rawBody, req.headers);
+    const order = getOrderByOrderNo(notification.outTradeNo);
+
+    if (!order) {
+      return res.status(404).json({ code: 'FAIL', message: 'Order not found.' });
+    }
+
+    if (notification.tradeState === 'SUCCESS') {
+      markOrderAsPaid(order, notification.transactionId, notification.successTime);
+    }
+
+    return res.json({ code: 'SUCCESS', message: '成功' });
+  } catch (error) {
+    return res.status(400).json({
+      code: 'FAIL',
+      message: error instanceof Error ? error.message : 'Invalid WeChat Pay notification.'
+    });
+  }
 });
 
 app.get('/api/engineers', (_req: Request, res: Response) => {
   res.json({ success: true, data: engineers });
 });
 
-app.get('/api/engineer/orders/pending', (_req: Request, res: Response) => {
+app.get('/api/engineer/orders/pending', requireAuth(['engineer', 'admin']), (_req: Request, res: Response) => {
   res.json({ success: true, data: orders.filter((order) => order.status === '待分配') });
 });
 
-app.get('/api/engineer/stats', (_req: Request, res: Response) => {
-  const activeEngineer = engineers[0];
-  const myOrders = orders.filter((order) => order.engineerId === activeEngineer.id);
+app.get('/api/engineer/stats', requireAuth(['engineer', 'admin']), (req: Request, res: Response) => {
+  const currentUser = (req as RawBodyRequest).authUser!;
+  const engineerProfile = getEngineerByUserId(currentUser.id);
+  const myOrders = engineerProfile ? orders.filter((order) => order.engineerId === engineerProfile.id) : [];
+
   res.json({
     success: true,
     data: {
       todayOrders: myOrders.length,
       todayIncome: myOrders.reduce((sum, order) => sum + order.totalAmount, 0),
-      rating: activeEngineer.avgRating
+      rating: engineerProfile?.avgRating ?? 0,
+      engineer: engineerProfile
     }
   });
 });
 
-app.post('/api/engineer/orders/:id/accept', (req: Request, res: Response) => {
+app.post('/api/engineer/orders/:id/accept', requireAuth(['engineer', 'admin']), (req: Request, res: Response) => {
+  const currentUser = (req as RawBodyRequest).authUser!;
   const order = getOrderById(Number(req.params.id));
-  const engineerId = Number((req.body as { engineerId?: number }).engineerId || engineers[0].id);
-
   if (!order) {
-    return res.status(404).json({ success: false, message: 'Order not found' });
+    return res.status(404).json({ success: false, message: 'Order not found.' });
   }
 
-  order.engineerId = engineerId;
+  const fallbackEngineer = currentUser.role === 'engineer' ? getEngineerByUserId(currentUser.id) : undefined;
+  const requestedEngineerId = Number((req.body as { engineerId?: number }).engineerId);
+  const engineer = currentUser.role === 'admin' ? getEngineerById(requestedEngineerId) : fallbackEngineer;
+
+  if (!engineer) {
+    return res.status(400).json({ success: false, message: 'Engineer profile is not available.' });
+  }
+
+  order.engineerId = engineer.id;
   order.status = '待上门';
   return res.json({ success: true, data: order });
 });
 
-app.put('/api/engineer/orders/:id/start', (req: Request, res: Response) => {
+app.put('/api/engineer/orders/:id/start', requireAuth(['engineer', 'admin']), (req: Request, res: Response) => {
+  const currentUser = (req as RawBodyRequest).authUser!;
   const order = getOrderById(Number(req.params.id));
   if (!order) {
-    return res.status(404).json({ success: false, message: 'Order not found' });
+    return res.status(404).json({ success: false, message: 'Order not found.' });
+  }
+
+  if (currentUser.role === 'engineer') {
+    const engineer = getEngineerByUserId(currentUser.id);
+    if (order.engineerId !== engineer?.id) {
+      return res.status(403).json({ success: false, message: 'You can only start your own assigned orders.' });
+    }
   }
 
   order.status = '服务中';
   return res.json({ success: true, data: order });
 });
 
-app.put('/api/engineer/orders/:id/complete', (req: Request, res: Response) => {
+app.put('/api/engineer/orders/:id/complete', requireAuth(['engineer', 'admin']), (req: Request, res: Response) => {
+  const currentUser = (req as RawBodyRequest).authUser!;
   const order = getOrderById(Number(req.params.id));
   if (!order) {
-    return res.status(404).json({ success: false, message: 'Order not found' });
+    return res.status(404).json({ success: false, message: 'Order not found.' });
+  }
+
+  if (currentUser.role === 'engineer') {
+    const engineer = getEngineerByUserId(currentUser.id);
+    if (order.engineerId !== engineer?.id) {
+      return res.status(403).json({ success: false, message: 'You can only complete your own assigned orders.' });
+    }
   }
 
   order.status = '待评价';
   return res.json({ success: true, data: order });
 });
 
-app.get('/api/admin/dashboard', (_req: Request, res: Response) => {
+app.get('/api/admin/dashboard', requireAuth(['admin']), (_req: Request, res: Response) => {
   res.json({
     success: true,
     data: {
@@ -213,24 +533,24 @@ app.get('/api/admin/dashboard', (_req: Request, res: Response) => {
   });
 });
 
-app.get('/api/admin/orders', (_req: Request, res: Response) => {
-  res.json({ success: true, data: orders });
+app.get('/api/admin/orders', requireAuth(['admin']), (_req: Request, res: Response) => {
+  res.json({ success: true, data: orders.slice().sort((a, b) => b.id - a.id) });
 });
 
-app.put('/api/admin/orders/:id/assign', (req: Request, res: Response) => {
+app.put('/api/admin/orders/:id/assign', requireAuth(['admin']), (req: Request, res: Response) => {
   const order = getOrderById(Number(req.params.id));
   const engineerId = Number((req.body as { engineerId?: number }).engineerId);
-  const engineer = engineers.find((item) => item.id === engineerId);
+  const engineer = getEngineerById(engineerId);
 
   if (!order) {
-    return res.status(404).json({ success: false, message: 'Order not found' });
+    return res.status(404).json({ success: false, message: 'Order not found.' });
   }
 
   if (!engineer) {
-    return res.status(404).json({ success: false, message: 'Engineer not found' });
+    return res.status(404).json({ success: false, message: 'Engineer not found.' });
   }
 
-  order.engineerId = engineerId;
+  order.engineerId = engineer.id;
   order.status = '待上门';
   return res.json({ success: true, data: order });
 });

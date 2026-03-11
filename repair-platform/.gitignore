@@ -7,3 +7,7 @@ coverage/
 .env
 server/.env
 client/.env
+server/certs/*.pem
+server/certs/*.key
+server/certs/*.crt
+!server/certs/.gitkeep

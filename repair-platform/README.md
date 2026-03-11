@@ -15,6 +15,7 @@
 - 工程师工作台：查看待接单、开始服务、完成服务
 - 管理后台：查看仪表盘与订单列表，支持指派工程师
 - 后端 API：认证、设备类型、维修项目、订单、工程师、管理员等基础接口
+- 微信支付：已接入 **WeChat Pay v3 Native 二维码支付** 后端签名、状态查询与回调处理流程
 
 ## 项目结构
 
@@ -72,3 +73,62 @@ repair-platform/
 - 文件上传（头像、评价图片）
 - WebSocket 在线客服与消息通知
 - GitHub Actions 自动部署
+
+## 微信支付接入说明
+
+当前项目已经加入了**真实微信支付 Native 支付流程代码**，适合 PC Web 场景：
+
+1. 用户下单并选择“微信支付”
+2. 后端调用微信支付 v3 Native 下单接口
+3. 前端展示二维码
+4. 用户用微信扫码付款
+5. 前端轮询支付状态，后端也支持微信回调通知更新订单
+
+### 你需要准备的内容
+
+要让它真的收款，你还需要把你的商户资料填进去：
+
+- 微信支付商户号
+- AppID
+- 商户证书序列号
+- API v3 Key
+- 商户私钥文件 `apiclient_key.pem`
+- 微信支付平台公钥文件
+- 一个公网可访问的回调地址（本地开发可用内网穿透，如 ngrok、cpolar）
+
+### 证书放置位置
+
+把证书文件放到：
+
+```text
+repair-platform/server/certs/
+```
+
+例如：
+
+- `repair-platform/server/certs/apiclient_key.pem`
+- `repair-platform/server/certs/wechatpay_platform_public_key.pem`
+
+### 环境变量
+
+编辑 `repair-platform/server/.env`：
+
+- `WECHAT_PAY_ENABLED=true`
+- `WECHAT_PAY_APP_ID=你的AppID`
+- `WECHAT_PAY_MCH_ID=你的商户号`
+- `WECHAT_PAY_SERIAL_NO=你的商户证书序列号`
+- `WECHAT_PAY_API_V3_KEY=你的32位APIv3密钥`
+- `WECHAT_PAY_PRIVATE_KEY_PATH=server/certs/apiclient_key.pem`
+- `WECHAT_PAY_PLATFORM_PUBLIC_KEY_PATH=server/certs/wechatpay_platform_public_key.pem`
+- `WECHAT_PAY_NOTIFY_URL=https://你的公网域名/api/payments/wechat/notify`
+
+### 已提供的接口
+
+- `GET /api/payments/wechat/readiness`：检查是否完成微信支付配置
+- `POST /api/payments/wechat/native/:orderId`：为订单创建微信 Native 二维码支付
+- `GET /api/payments/wechat/status/:orderId`：查询订单支付状态
+- `POST /api/payments/wechat/notify`：微信支付异步通知回调
+
+### 重要说明
+
+如果你现在直接运行项目但没有填商户信息，界面会提示“微信支付尚未完成配置”。这不是 bug，而是系统在阻止你拿占位符去和微信服务器硬碰硬。
