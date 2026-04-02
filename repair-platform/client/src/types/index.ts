@@ -72,6 +72,11 @@ export interface Order {
   transactionId?: string;
   paidAt?: string;
   paymentQrCode?: string;
+  customerNickname?: string;
+  customerPhone?: string;
+  engineerName?: string;
+  repairItemName?: string;
+  deviceTypeName?: string;
 }
 
 export interface PaymentReadiness {

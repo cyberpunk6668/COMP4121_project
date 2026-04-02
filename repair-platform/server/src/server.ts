@@ -20,6 +20,7 @@ import {
   markOrderAsPaid,
   markOrderAsPendingPayment,
   markOrderPaymentFailed,
+  Order,
   orders,
   repairItems,
   sanitizeUser,
@@ -39,6 +40,14 @@ import {
 dotenv.config();
 
 type RawBodyRequest = Request & { rawBody?: string; authUser?: User };
+
+type OrderView = Order & {
+  customerNickname?: string;
+  customerPhone?: string;
+  engineerName?: string;
+  repairItemName?: string;
+  deviceTypeName?: string;
+};
 
 type TokenPayload = {
   userId: number;
@@ -126,6 +135,26 @@ function getPaymentMode() {
 
 function buildManualWechatCodeUrl(orderNo: string) {
   return `weixin://wxpay/manual/${orderNo}`;
+}
+
+function presentOrder(order: Order): OrderView {
+  const customer = getUserById(order.userId);
+  const assignedEngineer = order.engineerId ? getEngineerById(order.engineerId) : undefined;
+  const repairItem = getRepairItemById(order.repairItemId);
+  const deviceType = deviceTypes.find((item) => item.id === order.deviceTypeId);
+
+  return {
+    ...order,
+    customerNickname: customer?.nickname,
+    customerPhone: customer?.phone,
+    engineerName: assignedEngineer?.realName,
+    repairItemName: repairItem?.name,
+    deviceTypeName: deviceType?.name
+  };
+}
+
+function presentOrders(items: Order[]) {
+  return items.map((item) => presentOrder(item));
 }
 
 app.get('/api/health', (_req: Request, res: Response) => {
@@ -230,7 +259,7 @@ app.get('/api/repair-items/:id', (req: Request, res: Response) => {
 
 app.get('/api/orders', requireAuth(), (req: Request, res: Response) => {
   const currentUser = (req as RawBodyRequest).authUser!;
-  res.json({ success: true, data: getOrdersForUser(currentUser) });
+  res.json({ success: true, data: presentOrders(getOrdersForUser(currentUser)) });
 });
 
 app.get('/api/orders/:id', requireAuth(), (req: Request, res: Response) => {
@@ -245,12 +274,12 @@ app.get('/api/orders/:id', requireAuth(), (req: Request, res: Response) => {
     return res.status(403).json({ success: false, message: 'You cannot access this order.' });
   }
 
-  return res.json({ success: true, data: order });
+  return res.json({ success: true, data: presentOrder(order) });
 });
 
 app.post('/api/orders', requireAuth(['customer', 'admin']), (req: Request, res: Response) => {
   const currentUser = (req as RawBodyRequest).authUser!;
-  const { deviceTypeId, repairItemId, deviceModel, problemDesc, address, appointmentTime, paymentMethod } = req.body as {
+  const { deviceTypeId, repairItemId, deviceModel, problemDesc, address, appointmentTime, paymentMethod, creditCardNumber, creditCardSecret } = req.body as {
     deviceTypeId?: number;
     repairItemId?: number;
     deviceModel?: string;
@@ -258,6 +287,8 @@ app.post('/api/orders', requireAuth(['customer', 'admin']), (req: Request, res: 
     address?: string;
     appointmentTime?: string;
     paymentMethod?: string;
+    creditCardNumber?: string;
+    creditCardSecret?: string;
   };
 
   if (!deviceTypeId || !repairItemId || !deviceModel || !problemDesc || !address || !appointmentTime || !paymentMethod) {
@@ -267,6 +298,17 @@ app.post('/api/orders', requireAuth(['customer', 'admin']), (req: Request, res: 
   const repairItem = getRepairItemById(Number(repairItemId));
   if (!repairItem) {
     return res.status(404).json({ success: false, message: 'Repair item not found.' });
+  }
+
+  if (paymentMethod === '信用卡') {
+    const normalizedCreditCardNumber = (creditCardNumber ?? '').replace(/\s|-/g, '');
+    if (!/^\d{13,19}$/.test(normalizedCreditCardNumber)) {
+      return res.status(400).json({ success: false, message: 'Credit card number must be 13 to 19 digits.' });
+    }
+
+    if (!/^\d{3,4}$/.test(creditCardSecret ?? '')) {
+      return res.status(400).json({ success: false, message: 'Credit card security code must be 3 or 4 digits.' });
+    }
   }
 
   const order = createOrder({
@@ -286,11 +328,14 @@ app.post('/api/orders', requireAuth(['customer', 'admin']), (req: Request, res: 
 
   if (paymentMethod === '微信支付') {
     markOrderAsPendingPayment(order, paymentMethod);
+  } else if (paymentMethod === '信用卡') {
+    const normalizedCreditCardNumber = (creditCardNumber ?? '').replace(/\s|-/g, '');
+    markOrderAsPaid(order, `credit-card-${normalizedCreditCardNumber.slice(-4)}`);
   } else {
     markOrderAsPaid(order, `offline-${order.orderNo}`);
   }
 
-  return res.status(201).json({ success: true, data: order });
+  return res.status(201).json({ success: true, data: presentOrder(order) });
 });
 
 app.put('/api/orders/:id/cancel', requireAuth(), (req: Request, res: Response) => {
@@ -305,7 +350,7 @@ app.put('/api/orders/:id/cancel', requireAuth(), (req: Request, res: Response) =
   }
 
   order.status = '已取消';
-  return res.json({ success: true, data: order });
+  return res.json({ success: true, data: presentOrder(order) });
 });
 
 app.post('/api/orders/:id/review', requireAuth(['customer', 'admin']), (req: Request, res: Response) => {
@@ -320,7 +365,7 @@ app.post('/api/orders/:id/review', requireAuth(['customer', 'admin']), (req: Req
   }
 
   order.status = '已完成';
-  return res.json({ success: true, data: { order, review: req.body } });
+  return res.json({ success: true, data: { order: presentOrder(order), review: req.body } });
 });
 
 app.get('/api/payments/wechat/readiness', requireAuth(), (_req: Request, res: Response) => {
@@ -347,7 +392,7 @@ app.post('/api/payments/wechat/native/:orderId', requireAuth(['customer', 'admin
     return res.json({
       success: true,
       data: {
-        order,
+        order: presentOrder(order),
         codeUrl: order.paymentQrCode,
         paymentMode: getPaymentMode().mode,
         canManualConfirm: false
@@ -368,7 +413,7 @@ app.post('/api/payments/wechat/native/:orderId', requireAuth(['customer', 'admin
     return res.json({
       success: true,
       data: {
-        order,
+        order: presentOrder(order),
         codeUrl,
         paymentMode: mode,
         canManualConfirm: mode === 'manual',
@@ -400,7 +445,7 @@ app.post('/api/payments/wechat/confirm/:orderId', requireAuth(['customer', 'admi
   }
 
   markOrderAsPaid(order, `manual-${order.orderNo}`);
-  return res.json({ success: true, data: order });
+  return res.json({ success: true, data: presentOrder(order) });
 });
 
 app.get('/api/payments/wechat/status/:orderId', requireAuth(), async (req: Request, res: Response) => {
@@ -432,7 +477,7 @@ app.get('/api/payments/wechat/status/:orderId', requireAuth(), async (req: Reque
     }
   }
 
-  return res.json({ success: true, data: { order, paymentMode: mode, readiness } });
+  return res.json({ success: true, data: { order: presentOrder(order), paymentMode: mode, readiness } });
 });
 
 app.post('/api/payments/wechat/notify', (req: Request, res: Response) => {
@@ -464,7 +509,7 @@ app.get('/api/engineers', (_req: Request, res: Response) => {
 });
 
 app.get('/api/engineer/orders/pending', requireAuth(['engineer', 'admin']), (_req: Request, res: Response) => {
-  res.json({ success: true, data: orders.filter((order) => order.status === '待分配') });
+  res.json({ success: true, data: presentOrders(orders.filter((order) => order.status === '待分配')) });
 });
 
 app.get('/api/engineer/stats', requireAuth(['engineer', 'admin']), (req: Request, res: Response) => {
@@ -500,7 +545,7 @@ app.post('/api/engineer/orders/:id/accept', requireAuth(['engineer', 'admin']), 
 
   order.engineerId = engineer.id;
   order.status = '待上门';
-  return res.json({ success: true, data: order });
+  return res.json({ success: true, data: presentOrder(order) });
 });
 
 app.put('/api/engineer/orders/:id/start', requireAuth(['engineer', 'admin']), (req: Request, res: Response) => {
@@ -518,7 +563,7 @@ app.put('/api/engineer/orders/:id/start', requireAuth(['engineer', 'admin']), (r
   }
 
   order.status = '服务中';
-  return res.json({ success: true, data: order });
+  return res.json({ success: true, data: presentOrder(order) });
 });
 
 app.put('/api/engineer/orders/:id/complete', requireAuth(['engineer', 'admin']), (req: Request, res: Response) => {
@@ -536,7 +581,7 @@ app.put('/api/engineer/orders/:id/complete', requireAuth(['engineer', 'admin']),
   }
 
   order.status = '待评价';
-  return res.json({ success: true, data: order });
+  return res.json({ success: true, data: presentOrder(order) });
 });
 
 app.get('/api/admin/dashboard', requireAuth(['admin']), (_req: Request, res: Response) => {
@@ -552,7 +597,7 @@ app.get('/api/admin/dashboard', requireAuth(['admin']), (_req: Request, res: Res
 });
 
 app.get('/api/admin/orders', requireAuth(['admin']), (_req: Request, res: Response) => {
-  res.json({ success: true, data: orders.slice().sort((a, b) => b.id - a.id) });
+  res.json({ success: true, data: presentOrders(orders.slice().sort((a, b) => b.id - a.id)) });
 });
 
 app.put('/api/admin/orders/:id/assign', requireAuth(['admin']), (req: Request, res: Response) => {
@@ -570,7 +615,7 @@ app.put('/api/admin/orders/:id/assign', requireAuth(['admin']), (req: Request, r
 
   order.engineerId = engineer.id;
   order.status = '待上门';
-  return res.json({ success: true, data: order });
+  return res.json({ success: true, data: presentOrder(order) });
 });
 
 app.listen(PORT, () => {

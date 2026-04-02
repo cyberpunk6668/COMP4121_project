@@ -46,7 +46,7 @@ import {
   UserOutlined,
   WifiOutlined
 } from '@ant-design/icons';
-import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import dayjs, { type Dayjs } from 'dayjs';
 import api from './api/http';
 import {
@@ -58,6 +58,7 @@ import {
   serviceSteps,
   testimonials
 } from './data/mock';
+import InteractiveMapPreview from './components/InteractiveMapPreview';
 import type { AuthUser, DeviceType, Engineer, Order, PaymentMode, PaymentReadiness, RepairItem, UserRole } from './types';
 
 const { Header, Content, Footer } = Layout;
@@ -94,6 +95,18 @@ function findRepairItem(items: RepairItem[], id: number) {
 
 function findDeviceName(deviceTypes: DeviceType[], id: number) {
   return deviceTypes.find((item) => item.id === id)?.name ?? '未知设备';
+}
+
+function getOrderServiceName(order: Order, repairItems: RepairItem[]) {
+  return order.repairItemName ?? findRepairItem(repairItems, order.repairItemId)?.name ?? '未知服务';
+}
+
+function getOrderDeviceTypeName(order: Order, deviceTypes: DeviceType[]) {
+  return order.deviceTypeName ?? findDeviceName(deviceTypes, order.deviceTypeId);
+}
+
+function normalizeCardNumber(value: string) {
+  return value.replace(/[\s-]/g, '');
 }
 
 function buildNumberRange(start: number, end: number) {
@@ -636,6 +649,8 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
   const [submitting, setSubmitting] = useState(false);
   const selectedDeviceId = Form.useWatch('deviceTypeId', form) as number | undefined;
   const selectedRepairItemId = Form.useWatch('repairItemId', form) as number | undefined;
+  const selectedPaymentMethod = Form.useWatch('paymentMethod', form) as string | undefined;
+  const typedAddress = Form.useWatch('address', form) as string | undefined;
 
   const itemOptions = useMemo(
     () => repairItems.filter((item) => !selectedDeviceId || item.deviceTypeId === selectedDeviceId),
@@ -696,11 +711,14 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
     address: string;
     appointmentTime: Dayjs;
     paymentMethod: string;
+    creditCardNumber?: string;
+    creditCardSecret?: string;
   }) => {
     setSubmitting(true);
     try {
       const createOrderResponse = await api.post('/orders', {
         ...values,
+        creditCardNumber: values.creditCardNumber ? normalizeCardNumber(values.creditCardNumber) : undefined,
         appointmentTime: values.appointmentTime.format('YYYY-MM-DD HH:mm')
       });
       const createdOrder = createOrderResponse.data.data as Order;
@@ -709,6 +727,9 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
       if (values.paymentMethod === '微信支付') {
         message.success('订单已创建，请进入支付页完成微信支付。');
         navigate(`/payment/${createdOrder.id}`);
+      } else if (values.paymentMethod === '信用卡') {
+        message.success('信用卡支付成功，订单已创建并进入待分配状态。');
+        navigate('/user');
       } else {
         message.success('订单已创建，非微信支付方式按演示逻辑自动完成支付。');
         navigate('/user');
@@ -816,16 +837,55 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
                     options={[
                       { label: '微信支付', value: '微信支付' },
                       { label: '支付宝', value: '支付宝' },
-                      { label: '银行卡', value: '银行卡' }
+                      { label: '信用卡', value: '信用卡' }
                     ]}
                   />
                 </Form.Item>
+                {selectedPaymentMethod === '信用卡' ? (
+                  <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                    <Form.Item
+                      name="creditCardNumber"
+                      label="信用卡号"
+                      rules={[
+                        { required: true, message: '请输入信用卡号' },
+                        {
+                          validator: async (_rule, value?: string) => {
+                            if (!value) {
+                              return;
+                            }
+
+                            const normalized = normalizeCardNumber(value);
+                            if (!/^\d{13,19}$/.test(normalized)) {
+                              throw new Error('请输入 13 到 19 位信用卡号');
+                            }
+                          }
+                        }
+                      ]}
+                    >
+                      <Input prefix={<CreditCardOutlined />} placeholder="例如：4242 4242 4242 4242" maxLength={23} />
+                    </Form.Item>
+                    <Form.Item
+                      name="creditCardSecret"
+                      label="信用卡安全码"
+                      rules={[
+                        { required: true, message: '请输入信用卡安全码' },
+                        { pattern: /^\d{3,4}$/, message: '安全码一般为 3 或 4 位数字' }
+                      ]}
+                    >
+                      <Password placeholder="请输入卡背面 3 或 4 位安全码" maxLength={4} visibilityToggle={false} />
+                    </Form.Item>
+                  </Space>
+                ) : null}
               </Col>
               <Col xs={24} md={12}>
                 <Card bordered={false} style={{ background: '#fff7e8', marginTop: 30 }}>
                   <Space align="start">
                     <CreditCardOutlined style={{ color: '#ff7a00', fontSize: 20, marginTop: 6 }} />
-                    <Text type="secondary">微信支付订单将进入专属支付页，展示你的微信收款码；用户扫码后可点击“我已完成支付”通知平台。</Text>
+                    <Text type="secondary">
+                      {selectedPaymentMethod === '信用卡'
+                        ? '信用卡支付会在提交时校验卡号与安全码，并按演示流程立即完成付款。'
+                        : '微信支付订单将进入专属支付页，展示你的微信收款码；用户扫码后可点击“我已完成支付”通知平台。'}
+                    </Text>
                   </Space>
                 </Card>
               </Col>
@@ -843,12 +903,18 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
             items={[
               { children: '填写设备、故障与地址信息' },
               { children: '平台确认价格并创建订单' },
-              { children: '进入支付页继续完成微信支付' },
+              { children: '根据支付方式完成微信扫码、信用卡支付或其他方式付款' },
               { children: '工程师抢单或后台指派' },
               { children: '上门服务并完成订单' }
             ]}
           />
         </Card>
+        <InteractiveMapPreview
+          title="上门地址地图预览"
+          query={typedAddress}
+          helperText="根据你填写的地址生成演示地图，方便确认大致位置即可。"
+          emptyText="在左侧输入上门地址后，这里会显示地图预览。"
+        />
       </Col>
     </Row>
   );
@@ -1206,7 +1272,7 @@ function UserCenterPage({ currentUser, orders, repairItems, refreshData }: { cur
   );
 }
 
-function EngineerPage({ currentUser, orders, refreshOrders }: { currentUser: AuthUser | null; orders: Order[]; refreshOrders: () => Promise<void> }) {
+function EngineerPage({ currentUser, orders, refreshOrders, deviceTypes, repairItems }: { currentUser: AuthUser | null; orders: Order[]; refreshOrders: () => Promise<void>; deviceTypes: DeviceType[]; repairItems: RepairItem[] }) {
   if (!currentUser) {
     return <AccessDeniedCard title="请先登录工程师账号" description="工程师端需要登录后才能查看待接单和我的服务单。" />;
   }
@@ -1216,7 +1282,10 @@ function EngineerPage({ currentUser, orders, refreshOrders }: { currentUser: Aut
   }
 
   const activeEngineer = currentUser.engineerProfile ?? fallbackEngineers[0];
-  const pendingOrders = orders.filter((order) => ['待分配', '待上门', '服务中'].includes(order.status));
+  const availableOrders = orders.filter((order) => order.status === '待分配');
+  const myOrders = orders.filter((order) => order.engineerId === activeEngineer.id);
+  const activeOrders = myOrders.filter((order) => ['待上门', '服务中'].includes(order.status));
+  const followUpOrders = myOrders.filter((order) => ['待评价', '已完成', '已取消'].includes(order.status));
 
   const updateOrder = async (orderId: number, action: 'accept' | 'start' | 'complete') => {
     try {
@@ -1236,6 +1305,80 @@ function EngineerPage({ currentUser, orders, refreshOrders }: { currentUser: Aut
     }
   };
 
+  const renderOrderCard = (order: Order) => {
+    const serviceName = getOrderServiceName(order, repairItems);
+    const deviceTypeName = getOrderDeviceTypeName(order, deviceTypes);
+
+    return (
+      <Card className="glass-card" key={order.id}>
+        <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
+          <div>
+            <Title level={4} style={{ marginBottom: 4 }}>{serviceName}</Title>
+            <Text type="secondary">订单号：{order.orderNo} · {deviceTypeName} / {order.deviceModel}</Text>
+          </div>
+          <Space wrap>
+            <Tag color={statusColors[order.status]}>{order.status}</Tag>
+            <Tag color={paymentStatusColors[order.paymentStatus]}>{order.paymentStatus}</Tag>
+            <Tag color="orange">{currencyFormatter.format(order.totalAmount)}</Tag>
+          </Space>
+        </Flex>
+
+        <Progress percent={getOrderProgress(order.status)} strokeColor="#ff7a00" showInfo={false} style={{ margin: '18px 0' }} />
+
+        <Row gutter={[16, 16]}>
+          <Col xs={24} xl={16}>
+            <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
+              <Descriptions.Item label="服务项目">{serviceName}</Descriptions.Item>
+              <Descriptions.Item label="设备类型">{deviceTypeName}</Descriptions.Item>
+              <Descriptions.Item label="设备型号">{order.deviceModel}</Descriptions.Item>
+              <Descriptions.Item label="预约时间">{order.appointmentTime}</Descriptions.Item>
+              <Descriptions.Item label="客户昵称">{order.customerNickname ?? '平台用户'}</Descriptions.Item>
+              <Descriptions.Item label="联系电话">{order.customerPhone ?? '平台统一协调'}</Descriptions.Item>
+              <Descriptions.Item label="订单金额">{currencyFormatter.format(order.totalAmount)}</Descriptions.Item>
+              <Descriptions.Item label="支付状态">{order.paymentStatus}</Descriptions.Item>
+              <Descriptions.Item label="上门地址" span={2}>{order.address}</Descriptions.Item>
+            </Descriptions>
+          </Col>
+          <Col xs={24} xl={8}>
+            <Space direction="vertical" size={12} style={{ width: '100%' }}>
+              <Card bordered={false} style={{ background: '#fff7e8', height: '100%' }}>
+                <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                  <Text strong>维修需求</Text>
+                  <Text>{order.problemDesc}</Text>
+                  <Text type="secondary">建议工程师提前确认故障范围、所需工具及上门路线，避免现场“带错装备”的经典剧情。</Text>
+                </Space>
+              </Card>
+              <InteractiveMapPreview
+                title="订单位置地图"
+                query={order.address}
+                helperText="根据客户填写的上门地址展示演示级地图位置。"
+                emptyText="该订单暂未填写上门地址。"
+                height={260}
+              />
+            </Space>
+          </Col>
+        </Row>
+
+        <Space wrap style={{ marginTop: 18 }}>
+          {order.status === '待分配' ? <Button type="primary" onClick={() => void updateOrder(order.id, 'accept')}>抢单</Button> : null}
+          {order.status === '待上门' ? <Button onClick={() => void updateOrder(order.id, 'start')}>开始服务</Button> : null}
+          {order.status === '服务中' ? <Button type="primary" onClick={() => void updateOrder(order.id, 'complete')}>完成服务</Button> : null}
+        </Space>
+      </Card>
+    );
+  };
+
+  const renderOrderSection = (list: Order[], emptyDescription: string) =>
+    list.length === 0 ? (
+      <Card className="glass-card">
+        <Empty description={emptyDescription} />
+      </Card>
+    ) : (
+      <Space direction="vertical" size={16} style={{ width: '100%' }}>
+        {list.map((order) => renderOrderCard(order))}
+      </Space>
+    );
+
   return (
     <Space direction="vertical" size={20} style={{ width: '100%' }}>
       <Card className="glass-card">
@@ -1246,41 +1389,49 @@ function EngineerPage({ currentUser, orders, refreshOrders }: { currentUser: Aut
               <div>
                 <Title level={3} style={{ marginBottom: 4 }}>{activeEngineer.realName} 的工作台</Title>
                 <Text type="secondary">{activeEngineer.skillDesc}</Text>
+                <div style={{ marginTop: 6 }}>
+                  <Text type="secondary">本页只保留工程师最关心的订单信息：客户需求、地址、时间、支付状态与处理动作。</Text>
+                </div>
               </div>
             </Flex>
           </Col>
           <Col xs={24} md={8}>
-            <Row gutter={12}>
-              <Col span={12}><Statistic title="可处理订单" value={pendingOrders.length} /></Col>
+            <Row gutter={[12, 12]}>
+              <Col span={12}><Statistic title="待抢单" value={availableOrders.length} /></Col>
+              <Col span={12}><Statistic title="进行中" value={activeOrders.length} /></Col>
+              <Col span={12}><Statistic title="待评价" value={followUpOrders.filter((order) => order.status === '待评价').length} /></Col>
               <Col span={12}><Statistic title="累计订单" value={activeEngineer.totalOrders} /></Col>
             </Row>
           </Col>
         </Row>
       </Card>
 
-      {pendingOrders.length === 0 ? (
-        <Card className="glass-card"><Empty description="暂无可处理订单。" /></Card>
-      ) : pendingOrders.map((order) => (
-        <Card className="glass-card" key={order.id}>
-          <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
-            <div>
-              <Title level={4} style={{ marginBottom: 4 }}>{order.deviceModel}</Title>
-              <Text type="secondary">{order.address}</Text>
-            </div>
-            <Tag color={statusColors[order.status]}>{order.status}</Tag>
-          </Flex>
-          <Descriptions column={{ xs: 1, md: 2 }} style={{ marginTop: 16 }}>
-            <Descriptions.Item label="预约时间">{order.appointmentTime}</Descriptions.Item>
-            <Descriptions.Item label="支付状态">{order.paymentStatus}</Descriptions.Item>
-            <Descriptions.Item label="问题描述" span={2}>{order.problemDesc}</Descriptions.Item>
-          </Descriptions>
-          <Space wrap>
-            {order.status === '待分配' ? <Button type="primary" onClick={() => void updateOrder(order.id, 'accept')}>抢单</Button> : null}
-            {order.status === '待上门' ? <Button onClick={() => void updateOrder(order.id, 'start')}>开始服务</Button> : null}
-            {order.status === '服务中' ? <Button type="primary" onClick={() => void updateOrder(order.id, 'complete')}>完成服务</Button> : null}
-          </Space>
-        </Card>
-      ))}
+      <InteractiveMapPreview
+        title="工程师服务区域地图"
+        query={activeEngineer.serviceArea}
+        helperText="根据工程师填写的服务区域展示一个演示级地图位置，方便快速判断接单范围。"
+        emptyText="工程师尚未填写服务区域，因此暂时无法展示地图。"
+      />
+
+      <Tabs
+        items={[
+          {
+            key: 'available',
+            label: `待抢单 (${availableOrders.length})`,
+            children: renderOrderSection(availableOrders, '当前暂无待抢单订单。')
+          },
+          {
+            key: 'active',
+            label: `我的进行中 (${activeOrders.length})`,
+            children: renderOrderSection(activeOrders, '当前没有进行中的服务订单。')
+          },
+          {
+            key: 'follow-up',
+            label: `待评价 / 历史 (${followUpOrders.length})`,
+            children: renderOrderSection(followUpOrders, '当前没有待跟进或历史订单。')
+          }
+        ]}
+      />
     </Space>
   );
 }
@@ -1439,25 +1590,32 @@ function AppContent() {
     navigate('/');
   };
 
-  const navigationItems = [
-    { key: '/', icon: <DashboardOutlined />, label: <Link to="/">首页</Link> },
-    { key: '/services', icon: <LaptopOutlined />, label: <Link to="/services">服务列表</Link> },
-    ...(currentUser && (currentUser.role === 'customer' || currentUser.role === 'admin')
-      ? [{ key: '/booking', icon: <CalendarOutlined />, label: <Link to="/booking">预约下单</Link> }]
-      : []),
-    ...(currentUser && (currentUser.role === 'customer' || currentUser.role === 'admin')
-      ? [{ key: '/user', icon: <UserOutlined />, label: <Link to="/user">个人中心</Link> }]
-      : []),
-    ...(currentUser && (currentUser.role === 'engineer' || currentUser.role === 'admin')
-      ? [{ key: '/engineer', icon: <ToolOutlined />, label: <Link to="/engineer">工程师端</Link> }]
-      : []),
-    ...(currentUser?.role === 'admin'
-      ? [{ key: '/admin', icon: <SafetyCertificateOutlined />, label: <Link to="/admin">管理后台</Link> }]
-      : []),
-    ...(!currentUser ? [{ key: '/auth', icon: <LoginOutlined />, label: <Link to="/auth">登录 / 注册</Link> }] : [])
-  ];
+  const isEngineerOnly = currentUser?.role === 'engineer';
+
+  const navigationItems = isEngineerOnly
+    ? [{ key: '/engineer', icon: <ToolOutlined />, label: <Link to="/engineer">订单工作台</Link> }]
+    : [
+        { key: '/', icon: <DashboardOutlined />, label: <Link to="/">首页</Link> },
+        { key: '/services', icon: <LaptopOutlined />, label: <Link to="/services">服务列表</Link> },
+        ...(currentUser && (currentUser.role === 'customer' || currentUser.role === 'admin')
+          ? [{ key: '/booking', icon: <CalendarOutlined />, label: <Link to="/booking">预约下单</Link> }]
+          : []),
+        ...(currentUser && (currentUser.role === 'customer' || currentUser.role === 'admin')
+          ? [{ key: '/user', icon: <UserOutlined />, label: <Link to="/user">个人中心</Link> }]
+          : []),
+        ...(currentUser && (currentUser.role === 'engineer' || currentUser.role === 'admin')
+          ? [{ key: '/engineer', icon: <ToolOutlined />, label: <Link to="/engineer">工程师端</Link> }]
+          : []),
+        ...(currentUser?.role === 'admin'
+          ? [{ key: '/admin', icon: <SafetyCertificateOutlined />, label: <Link to="/admin">管理后台</Link> }]
+          : []),
+        ...(!currentUser ? [{ key: '/auth', icon: <LoginOutlined />, label: <Link to="/auth">登录 / 注册</Link> }] : [])
+      ];
 
   const selectedKey = useMemo(() => {
+    if (isEngineerOnly) {
+      return '/engineer';
+    }
     if (location.pathname.startsWith('/payment')) {
       return '/user';
     }
@@ -1465,7 +1623,7 @@ function AppContent() {
       return '/auth';
     }
     return navigationItems.find((item) => item.key === location.pathname)?.key ?? '/';
-  }, [location.pathname, navigationItems]);
+  }, [isEngineerOnly, location.pathname, navigationItems]);
 
   return (
     <Layout className="app-shell">
@@ -1501,13 +1659,13 @@ function AppContent() {
             </Card>
           ) : (
             <Routes>
-              <Route path="/" element={<HomePage currentUser={currentUser} deviceTypes={deviceTypes} repairItems={repairItems} engineers={engineers} />} />
-              <Route path="/services" element={<ServicesPage deviceTypes={deviceTypes} repairItems={repairItems} />} />
+              <Route path="/" element={isEngineerOnly ? <Navigate to="/engineer" replace /> : <HomePage currentUser={currentUser} deviceTypes={deviceTypes} repairItems={repairItems} engineers={engineers} />} />
+              <Route path="/services" element={isEngineerOnly ? <Navigate to="/engineer" replace /> : <ServicesPage deviceTypes={deviceTypes} repairItems={repairItems} />} />
               <Route path="/auth" element={<AuthPage onAuthSuccess={persistSession} />} />
-              <Route path="/booking" element={<BookingPage currentUser={currentUser} deviceTypes={deviceTypes} repairItems={repairItems} refreshData={refreshData} />} />
+              <Route path="/booking" element={isEngineerOnly ? <Navigate to="/engineer" replace /> : <BookingPage currentUser={currentUser} deviceTypes={deviceTypes} repairItems={repairItems} refreshData={refreshData} />} />
               <Route path="/payment/:orderId" element={<PaymentPage currentUser={currentUser} refreshData={refreshData} />} />
-              <Route path="/user" element={<UserCenterPage currentUser={currentUser} orders={orders} repairItems={repairItems} refreshData={refreshData} />} />
-              <Route path="/engineer" element={<EngineerPage currentUser={currentUser} orders={orders} refreshOrders={refreshData} />} />
+              <Route path="/user" element={isEngineerOnly ? <Navigate to="/engineer" replace /> : <UserCenterPage currentUser={currentUser} orders={orders} repairItems={repairItems} refreshData={refreshData} />} />
+              <Route path="/engineer" element={<EngineerPage currentUser={currentUser} orders={orders} refreshOrders={refreshData} deviceTypes={deviceTypes} repairItems={repairItems} />} />
               <Route path="/admin" element={<AdminPage currentUser={currentUser} orders={orders} engineers={engineers} repairItems={repairItems} deviceTypes={deviceTypes} refreshOrders={refreshData} />} />
             </Routes>
           )}
