@@ -3,11 +3,15 @@ import ReactDOM from 'react-dom/client';
 import { ConfigProvider } from 'antd';
 import 'leaflet/dist/leaflet.css';
 import App from './App';
+import { LanguageProvider, useLanguage } from './i18n';
 import './styles.css';
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <React.StrictMode>
+function RootApp() {
+  const { antdLocale } = useLanguage();
+
+  return (
     <ConfigProvider
+      locale={antdLocale}
       theme={{
         token: {
           colorPrimary: '#ff7a00',
@@ -18,5 +22,13 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     >
       <App />
     </ConfigProvider>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+  <React.StrictMode>
+    <LanguageProvider>
+      <RootApp />
+    </LanguageProvider>
   </React.StrictMode>
 );

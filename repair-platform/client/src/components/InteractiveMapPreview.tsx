@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Empty, Flex, Spin, Typography } from 'antd';
 import { EnvironmentOutlined } from '@ant-design/icons';
 import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaflet';
+import { useLanguage } from '../i18n';
 
 const { Text } = Typography;
 
@@ -47,13 +48,15 @@ export default function InteractiveMapPreview({
   title,
   query,
   helperText,
-  emptyText = '填写地址后即可看到地图预览。',
+  emptyText,
   height = 280
 }: MapPreviewCardProps) {
+  const { tx } = useLanguage();
   const trimmedQuery = query?.trim();
   const [result, setResult] = useState<GeocodeResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const resolvedEmptyText = emptyText ?? tx('填写地址后即可看到地图预览。', 'Enter an address to preview it on the map.');
 
   useEffect(() => {
     if (!trimmedQuery) {
@@ -66,7 +69,7 @@ export default function InteractiveMapPreview({
     if (geocodeCache.has(trimmedQuery)) {
       const cached = geocodeCache.get(trimmedQuery) ?? null;
       setResult(cached);
-      setError(cached ? null : '暂时无法解析该位置，请尝试补充更完整的地址信息。');
+      setError(cached ? null : tx('暂时无法解析该位置，请尝试补充更完整的地址信息。', 'This location could not be resolved yet. Please try a more complete address.'));
       setLoading(false);
       return;
     }
@@ -83,14 +86,14 @@ export default function InteractiveMapPreview({
     })
       .then(async (response) => {
         if (!response.ok) {
-          throw new Error('地图服务暂时不可用');
+          throw new Error(tx('地图服务暂时不可用', 'The map service is temporarily unavailable'));
         }
         const data = (await response.json()) as GeocodeResponseItem[];
         const item = data[0];
         if (!item) {
           geocodeCache.set(trimmedQuery, null);
           setResult(null);
-          setError('暂时无法解析该位置，请尝试补充更完整的地址信息。');
+          setError(tx('暂时无法解析该位置，请尝试补充更完整的地址信息。', 'This location could not be resolved yet. Please try a more complete address.'));
           return;
         }
 
@@ -107,7 +110,7 @@ export default function InteractiveMapPreview({
           return;
         }
         setResult(null);
-        setError(fetchError instanceof Error ? fetchError.message : '地图解析失败');
+        setError(fetchError instanceof Error ? fetchError.message : tx('地图解析失败', 'Failed to resolve the map location'));
       })
       .finally(() => {
         if (!controller.signal.aborted) {
@@ -138,16 +141,16 @@ export default function InteractiveMapPreview({
         </div>
 
         {!trimmedQuery ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyText} />
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={resolvedEmptyText} />
         ) : loading ? (
           <div className="map-frame-shell map-frame-loading" style={{ height }}>
             <Spin size="large" />
           </div>
         ) : error || !center ? (
           <>
-            <Alert type="warning" showIcon message={error ?? '地图加载失败'} />
+            <Alert type="warning" showIcon message={error ?? tx('地图加载失败', 'Map failed to load')} />
             <Button type="link" icon={<EnvironmentOutlined />} href={buildMapSearchUrl(trimmedQuery)} target="_blank" rel="noreferrer" style={{ paddingInline: 0 }}>
-              在新窗口中查看地图
+              {tx('在新窗口中查看地图', 'Open map in a new window')}
             </Button>
           </>
         ) : (
@@ -170,9 +173,9 @@ export default function InteractiveMapPreview({
                 <SyncMapView center={center} />
               </MapContainer>
             </div>
-            <Text type="secondary">鼠标悬停在地图区域时，可直接使用滚轮缩放；拖动地图也已启用。</Text>
+            <Text type="secondary">{tx('鼠标悬停在地图区域时，可直接使用滚轮缩放；拖动地图也已启用。', 'Hover over the map to zoom with the mouse wheel. Dragging is enabled too.')}</Text>
             <Button type="link" icon={<EnvironmentOutlined />} href={buildMapSearchUrl(trimmedQuery)} target="_blank" rel="noreferrer" style={{ paddingInline: 0 }}>
-              在新窗口中查看地图
+              {tx('在新窗口中查看地图', 'Open map in a new window')}
             </Button>
           </>
         )}

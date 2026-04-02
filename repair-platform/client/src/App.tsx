@@ -49,6 +49,7 @@ import {
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import dayjs, { type Dayjs } from 'dayjs';
 import api from './api/http';
+import { useLanguage } from './i18n';
 import {
   fallbackDeviceTypes,
   fallbackEngineers,
@@ -183,6 +184,7 @@ function getDefaultPathByRole(role: UserRole) {
 
 function AccessDeniedCard({ title, description }: { title: string; description: string }) {
   const navigate = useNavigate();
+  const { tx } = useLanguage();
 
   return (
     <Card className="glass-card">
@@ -192,7 +194,7 @@ function AccessDeniedCard({ title, description }: { title: string; description: 
         subTitle={description}
         extra={
           <Button type="primary" onClick={() => navigate('/auth')}>
-            前往登录
+            {tx('前往登录', 'Go to sign in')}
           </Button>
         }
       />
@@ -202,6 +204,7 @@ function AccessDeniedCard({ title, description }: { title: string; description: 
 
 function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { currentUser: AuthUser | null; deviceTypes: DeviceType[]; repairItems: RepairItem[]; engineers: Engineer[] }) {
   const navigate = useNavigate();
+  const { t, tx } = useLanguage();
   const topServices = useMemo(() => repairItems.slice(0, 3), [repairItems]);
 
   return (
@@ -210,20 +213,20 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
         <Row gutter={[28, 28]} align="middle">
           <Col xs={24} lg={14}>
             <div className="hero-chip">
-              <SafetyCertificateOutlined /> 认证工程师上门，价格透明可追踪
+              <SafetyCertificateOutlined /> {tx('认证工程师上门，价格透明可追踪', 'Certified engineers onsite with transparent, trackable pricing')}
             </div>
             <Title className="hero-title" style={{ fontSize: 42, marginTop: 0, marginBottom: 16 }}>
-              修达达：把电子设备维修做成一键下单的服务体验
+              {tx('修达达：把电子设备维修做成一键下单的服务体验', 'Repair+ turns electronics repair into a smooth one-tap booking experience')}
             </Title>
             <Paragraph className="hero-subtitle" style={{ fontSize: 16, opacity: 0.92 }}>
-              支持手机、电脑、平板、相机等多类设备。用户在线预约，平台智能派单，工程师上门维修，管理员统一运营管理。
+              {tx('支持手机、电脑、平板、相机等多类设备。用户在线预约，平台智能派单，工程师上门维修，管理员统一运营管理。', 'Support for phones, computers, tablets, cameras, and more. Customers book online, the platform dispatches intelligently, engineers repair onsite, and admins keep everything running.')}
             </Paragraph>
             {currentUser ? (
               <Alert
                 type="success"
                 showIcon
-                message={`欢迎回来，${currentUser.nickname}`}
-                description={`当前身份：${getRoleLabel(currentUser.role)}。系统会根据你的注册身份自动展示对应工作台。`}
+                message={tx(`欢迎回来，${currentUser.nickname}`, `Welcome back, ${currentUser.nickname}`)}
+                description={tx(`当前身份：${getRoleLabel(currentUser.role)}。系统会根据你的注册身份自动展示对应工作台。`, `Current role: ${t(getRoleLabel(currentUser.role))}. The platform automatically opens the workspace that matches your account type.`)}
                 style={{ marginBottom: 18 }}
               />
             ) : null}
@@ -234,10 +237,10 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
                 icon={<ToolOutlined />}
                 onClick={() => navigate(currentUser ? '/booking' : '/auth')}
               >
-                {currentUser ? '立即预约维修' : '登录后预约'}
+                {currentUser ? tx('立即预约维修', 'Book a repair now') : tx('登录后预约', 'Sign in to book')}
               </Button>
               <Button size="large" ghost icon={<WifiOutlined />} onClick={() => navigate('/services')}>
-                查看热门服务
+                {tx('查看热门服务', 'Browse popular services')}
               </Button>
             </Space>
           </Col>
@@ -245,14 +248,14 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
             <Card className="glass-card" bordered={false}>
               <Space direction="vertical" size={18} style={{ width: '100%' }}>
                 <Title level={4} style={{ margin: 0 }}>
-                  热门服务速览
+                  {tx('热门服务速览', 'Popular service snapshot')}
                 </Title>
                 {topServices.map((item) => (
                   <Flex key={item.id} justify="space-between" align="center">
                     <div>
-                      <Text strong>{item.name}</Text>
+                      <Text strong>{t(item.name)}</Text>
                       <div>
-                        <Text type="secondary">约 {item.duration} 分钟 · 评分 {item.rating}</Text>
+                        <Text type="secondary">{tx(`约 ${item.duration} 分钟 · 评分 ${item.rating}`, `About ${item.duration} mins · Rated ${item.rating}`)}</Text>
                       </div>
                     </div>
                     <Tag color="orange">{currencyFormatter.format(item.price)}</Tag>
@@ -266,15 +269,15 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
 
       <div className="section-block">
         <Title level={2} className="section-title">
-          平台数据概览
+          {tx('平台数据概览', 'Platform snapshot')}
         </Title>
-        <Paragraph type="secondary">现在支持角色注册、登录、订单归属与支付页入口，终于不是“谁都能看谁的订单”的自由市场了。</Paragraph>
+        <Paragraph type="secondary">{tx('现在支持角色注册、登录、订单归属与支付页入口，终于不是“谁都能看谁的订单”的自由市场了。', 'The platform now supports role-based sign-up, sign-in, order ownership, and payment entry points—so it is no longer the wild west of everyone seeing everyone else’s orders.')}</Paragraph>
         <Row gutter={[16, 16]}>
           {heroStats.map((stat) => (
             <Col xs={24} sm={12} lg={6} key={stat.label}>
               <Card className="glass-card metric-card">
-                <Statistic title={stat.label} value={stat.value} />
-                <Text type="secondary">{stat.helper}</Text>
+                <Statistic title={t(stat.label)} value={stat.value} />
+                <Text type="secondary">{t(stat.helper)}</Text>
               </Card>
             </Col>
           ))}
@@ -284,18 +287,18 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
       <Row gutter={[24, 24]}>
         <Col xs={24} lg={15}>
           <Card className="glass-card">
-            <Title level={3}>服务流程</Title>
-            <Steps current={4} responsive items={serviceSteps.map((step) => ({ title: step }))} />
+            <Title level={3}>{tx('服务流程', 'Service journey')}</Title>
+            <Steps current={4} responsive items={serviceSteps.map((step) => ({ title: t(step) }))} />
           </Card>
         </Col>
         <Col xs={24} lg={9}>
           <Card className="glass-card">
-            <Title level={3}>平台优势</Title>
+            <Title level={3}>{tx('平台优势', 'Platform highlights')}</Title>
             <List
               dataSource={marketingHighlights}
               renderItem={(item) => (
                 <List.Item>
-                  <Text>{item}</Text>
+                  <Text>{t(item)}</Text>
                 </List.Item>
               )}
             />
@@ -305,9 +308,9 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
 
       <div className="section-block">
         <Title level={2} className="section-title">
-          热门设备类型
+          {tx('热门设备类型', 'Popular device types')}
         </Title>
-        <Paragraph type="secondary">点击设备卡片即可查看该设备对应的维修服务，像逛分类页一样丝滑。</Paragraph>
+        <Paragraph type="secondary">{tx('点击设备卡片即可查看该设备对应的维修服务，像逛分类页一样丝滑。', 'Click a device card to jump straight into the matching repair services, just like browsing a polished category page.')}</Paragraph>
         <Row gutter={[16, 16]}>
           {deviceTypes.map((device) => (
             <Col xs={12} sm={8} lg={6} key={device.id}>
@@ -315,15 +318,15 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
                 type="button"
                 className="device-card-button"
                 onClick={() => navigate(`/services?deviceTypeId=${device.id}`)}
-                aria-label={`查看${device.name}的维修服务`}
+                aria-label={tx(`查看${device.name}的维修服务`, `View repair services for ${t(device.name)}`)}
               >
                 <Card className="glass-card" hoverable>
                   <Space direction="vertical" align="center" style={{ width: '100%' }}>
                     <div style={{ fontSize: 42 }}>{device.icon}</div>
                     <Title level={4} style={{ margin: 0 }}>
-                      {device.name}
+                      {t(device.name)}
                     </Title>
-                    <Text type="secondary">常见故障快速预约</Text>
+                    <Text type="secondary">{t('常见故障快速预约')}</Text>
                   </Space>
                 </Card>
               </button>
@@ -334,7 +337,7 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
 
       <div className="section-block">
         <Title level={2} className="section-title">
-          金牌工程师
+          {tx('金牌工程师', 'Top engineers')}
         </Title>
         <Row gutter={[16, 16]}>
           {engineers.map((engineer) => (
@@ -344,13 +347,13 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
                   <Avatar src={engineer.avatar} size={72} icon={<UserOutlined />} />
                   <div>
                     <Title level={4} style={{ marginTop: 0, marginBottom: 6 }}>
-                      {engineer.realName}
+                      {t(engineer.realName)}
                     </Title>
-                    <Paragraph style={{ marginBottom: 8 }}>{engineer.skillDesc}</Paragraph>
+                    <Paragraph style={{ marginBottom: 8 }}>{t(engineer.skillDesc)}</Paragraph>
                     <Space wrap>
-                      <Tag color="blue">{engineer.serviceArea}</Tag>
-                      <Tag color="green">评分 {engineer.avgRating}</Tag>
-                      <Tag color="purple">累计 {engineer.totalOrders} 单</Tag>
+                      <Tag color="blue">{t(engineer.serviceArea)}</Tag>
+                      <Tag color="green">{tx(`评分 ${engineer.avgRating}`, `Rating ${engineer.avgRating}`)}</Tag>
+                      <Tag color="purple">{tx(`累计 ${engineer.totalOrders} 单`, `${engineer.totalOrders} orders completed`)}</Tag>
                     </Space>
                   </div>
                 </Flex>
@@ -362,7 +365,7 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
 
       <Card className="glass-card">
         <Title level={2} className="section-title">
-          用户评价
+          {tx('用户评价', 'Customer reviews')}
         </Title>
         <Row gutter={[16, 16]}>
           {testimonials.map((review) => (
@@ -370,8 +373,8 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
               <Card bordered={false}>
                 <Space direction="vertical">
                   <Rate disabled defaultValue={review.rating} />
-                  <Paragraph>{review.content}</Paragraph>
-                  <Text type="secondary">— {review.user}</Text>
+                  <Paragraph>{t(review.content)}</Paragraph>
+                  <Text type="secondary">— {t(review.user)}</Text>
                 </Space>
               </Card>
             </Col>
@@ -384,6 +387,7 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
 
 function ServicesPage({ deviceTypes, repairItems }: { deviceTypes: DeviceType[]; repairItems: RepairItem[] }) {
   const navigate = useNavigate();
+  const { t, tx } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const rawDeviceTypeId = searchParams.get('deviceTypeId');
@@ -427,17 +431,17 @@ function ServicesPage({ deviceTypes, repairItems }: { deviceTypes: DeviceType[];
         <Flex justify="space-between" align="center" wrap="wrap" gap={16}>
           <div>
             <Title level={2} style={{ marginBottom: 4 }}>
-              服务列表
+              {tx('服务列表', 'Service catalogue')}
             </Title>
             <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-              按设备类型浏览常见故障与维修方案，当前共上架 {repairItems.length} 项高频维修服务，点击“预约”后会自动带入填写页。
+              {tx(`按设备类型浏览常见故障与维修方案，当前共上架 ${repairItems.length} 项高频维修服务，点击“预约”后会自动带入填写页。`, `Browse common issues and repair plans by device type. There are currently ${repairItems.length} popular services available, and clicking “Book” will prefill the booking form for you.`)}
             </Paragraph>
             <Space wrap style={{ marginTop: 12 }}>
-              {selectedDevice ? <Tag color="geekblue">当前设备：{selectedDevice.icon} {selectedDevice.name}</Tag> : null}
-              <Tag color="orange">当前显示 {filteredItems.length} 项服务</Tag>
+              {selectedDevice ? <Tag color="geekblue">{tx('当前设备：', 'Current device: ')}{selectedDevice.icon} {t(selectedDevice.name)}</Tag> : null}
+              <Tag color="orange">{tx(`当前显示 ${filteredItems.length} 项服务`, `Showing ${filteredItems.length} services`)}</Tag>
               {selectedDevice ? (
                 <Button type="link" style={{ paddingInline: 0 }} onClick={() => handleActiveTypeChange('all')}>
-                  清除设备筛选
+                  {tx('清除设备筛选', 'Clear device filter')}
                 </Button>
               ) : null}
             </Space>
@@ -447,8 +451,8 @@ function ServicesPage({ deviceTypes, repairItems }: { deviceTypes: DeviceType[];
             style={{ minWidth: 220 }}
             onChange={handleActiveTypeChange}
             options={[
-              { label: '全部设备', value: 'all' },
-              ...deviceTypes.map((device) => ({ label: `${device.icon} ${device.name}`, value: device.id }))
+              { label: tx('全部设备', 'All devices'), value: 'all' },
+              ...deviceTypes.map((device) => ({ label: `${device.icon} ${t(device.name)}`, value: device.id }))
             ]}
           />
         </Flex>
@@ -456,24 +460,24 @@ function ServicesPage({ deviceTypes, repairItems }: { deviceTypes: DeviceType[];
 
       {filteredItems.length === 0 ? (
         <Card className="glass-card">
-          <Empty description={selectedDevice ? `${selectedDevice.name} 暂无可展示服务` : '暂无可展示服务'} />
+          <Empty description={selectedDevice ? tx(`${selectedDevice.name} 暂无可展示服务`, `No services are currently listed for ${t(selectedDevice.name)}`) : tx('暂无可展示服务', 'No services available yet')} />
         </Card>
       ) : (
         <Row gutter={[20, 20]}>
           {filteredItems.map((item) => (
             <Col xs={24} md={12} xl={8} key={item.id}>
               <Card className="glass-card" hoverable>
-                <img className="service-image" src={item.image} alt={item.name} />
+                <img className="service-image" src={item.image} alt={t(item.name)} />
                 <Space direction="vertical" size={10} style={{ marginTop: 18, width: '100%' }}>
                   <Flex justify="space-between" align="center">
-                    <Tag color="geekblue">{findDeviceName(deviceTypes, item.deviceTypeId)}</Tag>
-                    <Tag color="orange">销量 {item.sales}</Tag>
+                    <Tag color="geekblue">{t(findDeviceName(deviceTypes, item.deviceTypeId))}</Tag>
+                    <Tag color="orange">{tx(`销量 ${item.sales}`, `${item.sales} sold`)}</Tag>
                   </Flex>
                   <Title level={4} style={{ margin: 0 }}>
-                    {item.name}
+                    {t(item.name)}
                   </Title>
                   <Paragraph type="secondary" ellipsis={{ rows: 2 }} style={{ minHeight: 44, marginBottom: 0 }}>
-                    {item.description}
+                    {t(item.description)}
                   </Paragraph>
                   <Flex justify="space-between" align="center">
                     <Space>
@@ -485,9 +489,9 @@ function ServicesPage({ deviceTypes, repairItems }: { deviceTypes: DeviceType[];
                     </Text>
                   </Flex>
                   <Flex justify="space-between" align="center">
-                    <Text type="secondary">预计耗时 {item.duration} 分钟</Text>
+                    <Text type="secondary">{tx(`预计耗时 ${item.duration} 分钟`, `Estimated ${item.duration} mins`)}</Text>
                     <Button type="primary" onClick={() => navigate(`/booking?deviceTypeId=${item.deviceTypeId}&repairItemId=${item.id}`)}>
-                      预约
+                      {tx('预约', 'Book')}
                     </Button>
                   </Flex>
                 </Space>
@@ -502,6 +506,7 @@ function ServicesPage({ deviceTypes, repairItems }: { deviceTypes: DeviceType[];
 
 function AuthPage({ onAuthSuccess }: { onAuthSuccess: (token: string, user: AuthUser) => Promise<void> }) {
   const navigate = useNavigate();
+  const { t, tx } = useLanguage();
   const [loginForm] = Form.useForm();
   const [registerForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
@@ -513,14 +518,14 @@ function AuthPage({ onAuthSuccess }: { onAuthSuccess: (token: string, user: Auth
       const response = await api.post('/auth/login', values);
       const { token, user } = response.data.data as { token: string; user: AuthUser };
       await onAuthSuccess(token, user);
-      message.success('登录成功');
+      message.success(tx('登录成功', 'Signed in successfully'));
       navigate(getDefaultPathByRole(user.role));
     } catch (error: unknown) {
       const errorMessage =
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || '登录失败');
+      message.error(errorMessage || tx('登录失败', 'Sign-in failed'));
     } finally {
       setLoading(false);
     }
@@ -532,14 +537,14 @@ function AuthPage({ onAuthSuccess }: { onAuthSuccess: (token: string, user: Auth
       const response = await api.post('/auth/register', values);
       const { token, user } = response.data.data as { token: string; user: AuthUser };
       await onAuthSuccess(token, user);
-      message.success('注册成功，已自动登录');
+      message.success(tx('注册成功，已自动登录', 'Registration successful. You are now signed in automatically.'));
       navigate(getDefaultPathByRole(user.role));
     } catch (error: unknown) {
       const errorMessage =
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || '注册失败');
+      message.error(errorMessage || tx('注册失败', 'Registration failed'));
     } finally {
       setLoading(false);
     }
@@ -549,66 +554,66 @@ function AuthPage({ onAuthSuccess }: { onAuthSuccess: (token: string, user: Auth
     <Row gutter={[24, 24]}>
       <Col xs={24} lg={14}>
         <Card className="glass-card">
-          <Title level={2}>登录 / 注册</Title>
+          <Title level={2}>{tx('登录 / 注册', 'Sign in / Register')}</Title>
           <Paragraph type="secondary">
-            注册时可以直接选择身份：客户或工程师。系统会根据你的选择自动进入对应端口，终于不用“先注册后改人生”了。
+            {tx('注册时可以直接选择身份：客户或工程师。系统会根据你的选择自动进入对应端口，终于不用“先注册后改人生”了。', 'You can choose your role during registration—customer or engineer. The platform then sends you straight to the matching workspace, no identity crisis required.')}
           </Paragraph>
           <Tabs
             items={[
               {
                 key: 'login',
-                label: '登录',
+                label: tx('登录', 'Sign in'),
                 children: (
                   <Form form={loginForm} layout="vertical" onFinish={handleLogin}>
-                    <Form.Item name="phone" label="手机号" rules={[{ required: true, message: '请输入手机号' }]}>
-                      <Input placeholder="例如：13800000000" />
+                    <Form.Item name="phone" label={tx('手机号', 'Phone number')} rules={[{ required: true, message: tx('请输入手机号', 'Please enter your phone number') }]}>
+                      <Input placeholder={tx('例如：13800000000', 'Example: 13800000000')} />
                     </Form.Item>
-                    <Form.Item name="password" label="密码" rules={[{ required: true, message: '请输入密码' }]}>
-                      <Password placeholder="请输入密码" />
+                    <Form.Item name="password" label={tx('密码', 'Password')} rules={[{ required: true, message: tx('请输入密码', 'Please enter your password') }]}>
+                      <Password placeholder={tx('请输入密码', 'Enter your password')} />
                     </Form.Item>
                     <Button htmlType="submit" type="primary" icon={<LoginOutlined />} loading={loading}>
-                      登录
+                      {tx('登录', 'Sign in')}
                     </Button>
                   </Form>
                 )
               },
               {
                 key: 'register',
-                label: '注册',
+                label: tx('注册', 'Register'),
                 children: (
                   <Form form={registerForm} layout="vertical" onFinish={handleRegister}>
-                    <Form.Item name="nickname" label="昵称" rules={[{ required: true, message: '请输入昵称' }]}>
-                      <Input placeholder="请输入昵称" />
+                    <Form.Item name="nickname" label={tx('昵称', 'Nickname')} rules={[{ required: true, message: tx('请输入昵称', 'Please enter a nickname') }]}>
+                      <Input placeholder={tx('请输入昵称', 'Enter a nickname')} />
                     </Form.Item>
-                    <Form.Item name="phone" label="手机号" rules={[{ required: true, message: '请输入手机号' }]}>
-                      <Input placeholder="请输入手机号" />
+                    <Form.Item name="phone" label={tx('手机号', 'Phone number')} rules={[{ required: true, message: tx('请输入手机号', 'Please enter your phone number') }]}>
+                      <Input placeholder={tx('请输入手机号', 'Enter your phone number')} />
                     </Form.Item>
-                    <Form.Item name="password" label="密码" rules={[{ required: true, message: '请输入密码' }, { min: 6, message: '密码至少 6 位' }]}>
-                      <Password placeholder="请输入至少 6 位密码" />
+                    <Form.Item name="password" label={tx('密码', 'Password')} rules={[{ required: true, message: tx('请输入密码', 'Please enter your password') }, { min: 6, message: tx('密码至少 6 位', 'Password must be at least 6 characters') }]}>
+                      <Password placeholder={tx('请输入至少 6 位密码', 'Enter at least 6 characters')} />
                     </Form.Item>
-                    <Form.Item name="role" label="注册身份" rules={[{ required: true, message: '请选择身份' }]} initialValue="customer">
+                    <Form.Item name="role" label={tx('注册身份', 'Role')} rules={[{ required: true, message: tx('请选择身份', 'Please choose a role') }]} initialValue="customer">
                       <Select
                         options={[
-                          { label: '客户：下单维修', value: 'customer' },
-                          { label: '工程师：接单维修', value: 'engineer' }
+                          { label: tx('客户：下单维修', 'Customer: place repair orders'), value: 'customer' },
+                          { label: tx('工程师：接单维修', 'Engineer: accept and complete jobs'), value: 'engineer' }
                         ]}
                       />
                     </Form.Item>
                     {registerRole === 'engineer' ? (
                       <>
-                        <Form.Item name="realName" label="真实姓名" rules={[{ required: true, message: '请输入真实姓名' }]}>
-                          <Input placeholder="例如：张工" />
+                        <Form.Item name="realName" label={tx('真实姓名', 'Full name')} rules={[{ required: true, message: tx('请输入真实姓名', 'Please enter your full name') }]}>
+                          <Input placeholder={tx('例如：张工', 'Example: Engineer Zhang')} />
                         </Form.Item>
-                        <Form.Item name="serviceArea" label="服务区域" rules={[{ required: true, message: '请输入服务区域' }]}>
-                          <Input placeholder="例如：Sydney CBD / Zetland" />
+                        <Form.Item name="serviceArea" label={tx('服务区域', 'Service area')} rules={[{ required: true, message: tx('请输入服务区域', 'Please enter the service area') }]}>
+                          <Input placeholder={tx('例如：Sydney CBD / Zetland', 'Example: Sydney CBD / Zetland')} />
                         </Form.Item>
-                        <Form.Item name="skillDesc" label="技能描述" rules={[{ required: true, message: '请输入技能描述' }]}>
-                          <TextArea rows={3} placeholder="例如：擅长手机换屏、主板维修、电池更换" />
+                        <Form.Item name="skillDesc" label={tx('技能描述', 'Skill summary')} rules={[{ required: true, message: tx('请输入技能描述', 'Please describe your skills') }]}>
+                          <TextArea rows={3} placeholder={tx('例如：擅长手机换屏、主板维修、电池更换', 'Example: Specialised in screen replacement, logic board repair, and battery service')} />
                         </Form.Item>
                       </>
                     ) : null}
                     <Button htmlType="submit" type="primary" icon={<UserAddOutlined />} loading={loading}>
-                      注册并登录
+                      {tx('注册并登录', 'Register and sign in')}
                     </Button>
                   </Form>
                 )
@@ -619,7 +624,7 @@ function AuthPage({ onAuthSuccess }: { onAuthSuccess: (token: string, user: Auth
       </Col>
       <Col xs={24} lg={10}>
         <Card className="glass-card">
-          <Title level={4}>演示账号</Title>
+          <Title level={4}>{tx('演示账号', 'Demo accounts')}</Title>
           <List
             dataSource={[
               { role: '客户', phone: '13800000000', password: 'demo123' },
@@ -629,9 +634,9 @@ function AuthPage({ onAuthSuccess }: { onAuthSuccess: (token: string, user: Auth
             renderItem={(item) => (
               <List.Item>
                 <Descriptions column={1} size="small">
-                  <Descriptions.Item label="身份">{item.role}</Descriptions.Item>
-                  <Descriptions.Item label="手机号">{item.phone}</Descriptions.Item>
-                  <Descriptions.Item label="密码">{item.password}</Descriptions.Item>
+                  <Descriptions.Item label={tx('身份', 'Role')}>{t(item.role)}</Descriptions.Item>
+                  <Descriptions.Item label={tx('手机号', 'Phone number')}>{item.phone}</Descriptions.Item>
+                  <Descriptions.Item label={tx('密码', 'Password')}>{item.password}</Descriptions.Item>
                 </Descriptions>
               </List.Item>
             )}
@@ -644,6 +649,7 @@ function AuthPage({ onAuthSuccess }: { onAuthSuccess: (token: string, user: Auth
 
 function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { currentUser: AuthUser | null; deviceTypes: DeviceType[]; repairItems: RepairItem[]; refreshData: () => Promise<void> }) {
   const navigate = useNavigate();
+  const { t, tx } = useLanguage();
   const [searchParams] = useSearchParams();
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
@@ -696,11 +702,11 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
   }, [form, repairItems, selectedDeviceId]);
 
   if (!currentUser) {
-    return <AccessDeniedCard title="请先登录后下单" description="维修预约需要绑定账户，这样订单才知道该归谁，不然平台就像捡到匿名手机一样尴尬。" />;
+    return <AccessDeniedCard title={tx('请先登录后下单', 'Please sign in before placing an order')} description={tx('维修预约需要绑定账户，这样订单才知道该归谁，不然平台就像捡到匿名手机一样尴尬。', 'Repair bookings must be tied to an account so the order has a real owner—otherwise the platform ends up holding an anonymous broken phone like a confused lost-and-found desk.')} />;
   }
 
   if (currentUser.role !== 'customer' && currentUser.role !== 'admin') {
-    return <AccessDeniedCard title="当前身份不能下单" description="工程师账号默认进入接单工作台；如需体验客户端，请注册客户身份。" />;
+    return <AccessDeniedCard title={tx('当前身份不能下单', 'This role cannot place orders')} description={tx('工程师账号默认进入接单工作台；如需体验客户端，请注册客户身份。', 'Engineer accounts go straight to the job workspace. If you want to try the customer flow, please register as a customer.')} />;
   }
 
   const onFinish = async (values: {
@@ -725,13 +731,13 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
       await refreshData();
 
       if (values.paymentMethod === '微信支付') {
-        message.success('订单已创建，请进入支付页完成微信支付。');
+        message.success(tx('订单已创建，请进入支付页完成微信支付。', 'Order created. Please continue to the payment page to finish WeChat Pay.'));
         navigate(`/payment/${createdOrder.id}`);
       } else if (values.paymentMethod === '信用卡') {
-        message.success('信用卡支付成功，订单已创建并进入待分配状态。');
+        message.success(tx('信用卡支付成功，订单已创建并进入待分配状态。', 'Credit card payment succeeded. Your order has been created and is now waiting for assignment.'));
         navigate('/user');
       } else {
-        message.success('订单已创建，非微信支付方式按演示逻辑自动完成支付。');
+        message.success(tx('订单已创建，非微信支付方式按演示逻辑自动完成支付。', 'Order created. In this demo, non-WeChat payment methods are completed automatically.'));
         navigate('/user');
       }
 
@@ -741,7 +747,7 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || '创建订单失败，请确认后端服务已启动。');
+      message.error(errorMessage || tx('创建订单失败，请确认后端服务已启动。', 'Failed to create the order. Please make sure the backend server is running.'));
     } finally {
       setSubmitting(false);
     }
@@ -751,33 +757,33 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
     <Row gutter={[24, 24]}>
       <Col xs={24} lg={16}>
         <Card className="glass-card">
-          <Title level={2}>预约下单</Title>
-          <Paragraph type="secondary">客户账号下单后，如果选择微信支付，将跳转到专门的支付页继续完成付款；如果你是从服务列表点进来的，对应服务也会自动带入。预约时间现在也支持日历与时间选择，不用再手打了。</Paragraph>
+          <Title level={2}>{tx('预约下单', 'Book a repair')}</Title>
+          <Paragraph type="secondary">{tx('客户账号下单后，如果选择微信支付，将跳转到专门的支付页继续完成付款；如果你是从服务列表点进来的，对应服务也会自动带入。预约时间现在也支持日历与时间选择，不用再手打了。', 'After a customer places an order, choosing WeChat Pay sends them to the dedicated payment page. If you entered from the service catalogue, the selected service is prefilled automatically. Appointment time now supports calendar and time picking too—so no more manual typing gymnastics.')}</Paragraph>
           <Steps
             current={3}
             style={{ marginBottom: 28 }}
             items={[
-              { title: '设备信息' },
-              { title: '服务选择' },
-              { title: '预约信息' },
-              { title: '确认支付' }
+              { title: tx('设备信息', 'Device info') },
+              { title: tx('服务选择', 'Service selection') },
+              { title: tx('预约信息', 'Booking details') },
+              { title: tx('确认支付', 'Confirm payment') }
             ]}
           />
           <Form form={form} layout="vertical" onFinish={onFinish}>
             <Row gutter={16}>
               <Col xs={24} md={12}>
-                <Form.Item name="deviceTypeId" label="设备类型" rules={[{ required: true, message: '请选择设备类型' }]}>
+                <Form.Item name="deviceTypeId" label={tx('设备类型', 'Device type')} rules={[{ required: true, message: tx('请选择设备类型', 'Please choose a device type') }]}>
                   <Select
-                    placeholder="请选择设备类型"
-                    options={deviceTypes.map((device) => ({ label: `${device.icon} ${device.name}`, value: device.id }))}
+                    placeholder={tx('请选择设备类型', 'Choose a device type')}
+                    options={deviceTypes.map((device) => ({ label: `${device.icon} ${t(device.name)}`, value: device.id }))}
                   />
                 </Form.Item>
               </Col>
               <Col xs={24} md={12}>
-                <Form.Item name="repairItemId" label="维修项目" rules={[{ required: true, message: '请选择维修项目' }]}>
+                <Form.Item name="repairItemId" label={tx('维修项目', 'Repair service')} rules={[{ required: true, message: tx('请选择维修项目', 'Please choose a repair service') }]}>
                   <Select
-                    placeholder="请选择维修项目"
-                    options={itemOptions.map((item) => ({ label: `${item.name} · ${currencyFormatter.format(item.price)}`, value: item.id }))}
+                    placeholder={tx('请选择维修项目', 'Choose a repair service')}
+                    options={itemOptions.map((item) => ({ label: `${t(item.name)} · ${currencyFormatter.format(item.price)}`, value: item.id }))}
                   />
                 </Form.Item>
               </Col>
@@ -787,32 +793,32 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
                 <Space direction="vertical" size={4} style={{ width: '100%' }}>
                   <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
                     <Title level={4} style={{ margin: 0 }}>
-                      {selectedRepairItem.name}
+                      {t(selectedRepairItem.name)}
                     </Title>
                     <Tag color="orange">{currencyFormatter.format(selectedRepairItem.price)}</Tag>
                   </Flex>
-                  <Text type="secondary">{selectedRepairItem.description}</Text>
+                  <Text type="secondary">{t(selectedRepairItem.description)}</Text>
                   <Space wrap>
-                    <Tag color="geekblue">{findDeviceName(deviceTypes, selectedRepairItem.deviceTypeId)}</Tag>
-                    <Tag color="green">预计 {selectedRepairItem.duration} 分钟</Tag>
-                    <Tag color="purple">评分 {selectedRepairItem.rating}</Tag>
-                    <Tag color="cyan">销量 {selectedRepairItem.sales}</Tag>
+                    <Tag color="geekblue">{t(findDeviceName(deviceTypes, selectedRepairItem.deviceTypeId))}</Tag>
+                    <Tag color="green">{tx(`预计 ${selectedRepairItem.duration} 分钟`, `Estimated ${selectedRepairItem.duration} mins`)}</Tag>
+                    <Tag color="purple">{tx(`评分 ${selectedRepairItem.rating}`, `Rating ${selectedRepairItem.rating}`)}</Tag>
+                    <Tag color="cyan">{tx(`销量 ${selectedRepairItem.sales}`, `${selectedRepairItem.sales} sold`)}</Tag>
                   </Space>
                 </Space>
               </Card>
             ) : null}
             <Row gutter={16}>
               <Col xs={24} md={12}>
-                <Form.Item name="deviceModel" label="设备型号" rules={[{ required: true, message: '请输入设备型号' }]}>
-                  <Input placeholder="例如：iPhone 14 Pro / MacBook Air M2" />
+                <Form.Item name="deviceModel" label={tx('设备型号', 'Device model')} rules={[{ required: true, message: tx('请输入设备型号', 'Please enter the device model') }]}>
+                  <Input placeholder={tx('例如：iPhone 14 Pro / MacBook Air M2', 'Example: iPhone 14 Pro / MacBook Air M2')} />
                 </Form.Item>
               </Col>
               <Col xs={24} md={12}>
-                <Form.Item name="appointmentTime" label="预约时间" rules={[{ required: true, message: '请输入预约时间' }]}>
+                <Form.Item name="appointmentTime" label={tx('预约时间', 'Appointment time')} rules={[{ required: true, message: tx('请输入预约时间', 'Please choose an appointment time') }]}>
                   <DatePicker
                     style={{ width: '100%' }}
                     format="YYYY-MM-DD HH:mm"
-                    placeholder="请选择上门日期与时间"
+                    placeholder={tx('请选择上门日期与时间', 'Choose the visit date and time')}
                     showTime={{
                       format: 'HH:mm',
                       minuteStep: 30,
@@ -824,20 +830,20 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
                 </Form.Item>
               </Col>
             </Row>
-            <Form.Item name="problemDesc" label="问题描述" rules={[{ required: true, message: '请描述问题' }]}>
-              <TextArea rows={4} placeholder="请描述设备故障情况，例如碎屏、无法开机、电池鼓包等。" />
+            <Form.Item name="problemDesc" label={tx('问题描述', 'Issue description')} rules={[{ required: true, message: tx('请描述问题', 'Please describe the issue') }]}>
+              <TextArea rows={4} placeholder={tx('请描述设备故障情况，例如碎屏、无法开机、电池鼓包等。', 'Describe the device issue, such as a cracked screen, no power, or battery swelling.')} />
             </Form.Item>
-            <Form.Item name="address" label="上门地址" rules={[{ required: true, message: '请输入上门地址' }]}>
-              <Input placeholder="例如：Sydney CBD George St 100 号 1802 室" />
+            <Form.Item name="address" label={tx('上门地址', 'Service address')} rules={[{ required: true, message: tx('请输入上门地址', 'Please enter the service address') }]}>
+              <Input placeholder={tx('例如：Sydney CBD George St 100 号 1802 室', 'Example: Room 1802, 100 George St, Sydney CBD')} />
             </Form.Item>
             <Row gutter={16}>
               <Col xs={24} md={12}>
-                <Form.Item name="paymentMethod" label="支付方式" rules={[{ required: true, message: '请选择支付方式' }]} initialValue="微信支付">
+                <Form.Item name="paymentMethod" label={tx('支付方式', 'Payment method')} rules={[{ required: true, message: tx('请选择支付方式', 'Please choose a payment method') }]} initialValue="微信支付">
                   <Select
                     options={[
-                      { label: '微信支付', value: '微信支付' },
-                      { label: '支付宝', value: '支付宝' },
-                      { label: '信用卡', value: '信用卡' }
+                      { label: t('微信支付'), value: '微信支付' },
+                      { label: t('支付宝'), value: '支付宝' },
+                      { label: t('信用卡'), value: '信用卡' }
                     ]}
                   />
                 </Form.Item>
@@ -845,9 +851,9 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
                   <Space direction="vertical" size={0} style={{ width: '100%' }}>
                     <Form.Item
                       name="creditCardNumber"
-                      label="信用卡号"
+                      label={tx('信用卡号', 'Credit card number')}
                       rules={[
-                        { required: true, message: '请输入信用卡号' },
+                        { required: true, message: tx('请输入信用卡号', 'Please enter the credit card number') },
                         {
                           validator: async (_rule, value?: string) => {
                             if (!value) {
@@ -856,23 +862,23 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
 
                             const normalized = normalizeCardNumber(value);
                             if (!/^\d{13,19}$/.test(normalized)) {
-                              throw new Error('请输入 13 到 19 位信用卡号');
+                              throw new Error(tx('请输入 13 到 19 位信用卡号', 'Please enter a credit card number with 13 to 19 digits'));
                             }
                           }
                         }
                       ]}
                     >
-                      <Input prefix={<CreditCardOutlined />} placeholder="例如：4242 4242 4242 4242" maxLength={23} />
+                      <Input prefix={<CreditCardOutlined />} placeholder={tx('例如：4242 4242 4242 4242', 'Example: 4242 4242 4242 4242')} maxLength={23} />
                     </Form.Item>
                     <Form.Item
                       name="creditCardSecret"
-                      label="信用卡安全码"
+                      label={tx('信用卡安全码', 'Card security code')}
                       rules={[
-                        { required: true, message: '请输入信用卡安全码' },
-                        { pattern: /^\d{3,4}$/, message: '安全码一般为 3 或 4 位数字' }
+                        { required: true, message: tx('请输入信用卡安全码', 'Please enter the card security code') },
+                        { pattern: /^\d{3,4}$/, message: tx('安全码一般为 3 或 4 位数字', 'Security code should usually be 3 or 4 digits') }
                       ]}
                     >
-                      <Password placeholder="请输入卡背面 3 或 4 位安全码" maxLength={4} visibilityToggle={false} />
+                      <Password placeholder={tx('请输入卡背面 3 或 4 位安全码', 'Enter the 3 or 4 digit security code from the back of the card')} maxLength={4} visibilityToggle={false} />
                     </Form.Item>
                   </Space>
                 ) : null}
@@ -883,37 +889,37 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
                     <CreditCardOutlined style={{ color: '#ff7a00', fontSize: 20, marginTop: 6 }} />
                     <Text type="secondary">
                       {selectedPaymentMethod === '信用卡'
-                        ? '信用卡支付会在提交时校验卡号与安全码，并按演示流程立即完成付款。'
-                        : '微信支付订单将进入专属支付页，展示你的微信收款码；用户扫码后可点击“我已完成支付”通知平台。'}
+                        ? tx('信用卡支付会在提交时校验卡号与安全码，并按演示流程立即完成付款。', 'Credit card payments are validated on submit and then completed immediately in this demo flow.')
+                        : tx('微信支付订单将进入专属支付页，展示你的微信收款码；用户扫码后可点击“我已完成支付”通知平台。', 'WeChat Pay orders move to a dedicated payment page that shows your QR code. After scanning, the user can click “I have completed payment” to notify the platform.')}
                     </Text>
                   </Space>
                 </Card>
               </Col>
             </Row>
             <Button htmlType="submit" type="primary" size="large" loading={submitting}>
-              提交订单
+              {tx('提交订单', 'Submit order')}
             </Button>
           </Form>
         </Card>
       </Col>
       <Col xs={24} lg={8}>
         <Card className="glass-card">
-          <Title level={4}>下单说明</Title>
+          <Title level={4}>{tx('下单说明', 'Booking notes')}</Title>
           <Timeline
             items={[
-              { children: '填写设备、故障与地址信息' },
-              { children: '平台确认价格并创建订单' },
-              { children: '根据支付方式完成微信扫码、信用卡支付或其他方式付款' },
-              { children: '工程师抢单或后台指派' },
-              { children: '上门服务并完成订单' }
+              { children: tx('填写设备、故障与地址信息', 'Fill in device, issue, and address details') },
+              { children: tx('平台确认价格并创建订单', 'The platform confirms pricing and creates the order') },
+              { children: tx('根据支付方式完成微信扫码、信用卡支付或其他方式付款', 'Finish payment via WeChat scan, credit card, or another demo payment method') },
+              { children: tx('工程师抢单或后台指派', 'An engineer accepts the job or an admin assigns it') },
+              { children: tx('上门服务并完成订单', 'The engineer visits onsite and completes the order') }
             ]}
           />
         </Card>
         <InteractiveMapPreview
-          title="上门地址地图预览"
+          title={tx('上门地址地图预览', 'Service address map preview')}
           query={typedAddress}
-          helperText="根据你填写的地址生成演示地图，方便确认大致位置即可。"
-          emptyText="在左侧输入上门地址后，这里会显示地图预览。"
+          helperText={tx('根据你填写的地址生成演示地图，方便确认大致位置即可。', 'A demo map is generated from the address you enter, so you can quickly confirm the general location.')}
+          emptyText={tx('在左侧输入上门地址后，这里会显示地图预览。', 'Enter the service address on the left to preview it here on the map.')}
         />
       </Col>
     </Row>
@@ -923,6 +929,7 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
 function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | null; refreshData: () => Promise<void> }) {
   const { orderId } = useParams();
   const navigate = useNavigate();
+  const { t, tx } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [preparing, setPreparing] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
@@ -952,7 +959,7 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || '加载支付信息失败');
+      message.error(errorMessage || tx('加载支付信息失败', 'Failed to load payment details'));
     } finally {
       setLoading(false);
     }
@@ -975,7 +982,7 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || '生成支付二维码失败');
+      message.error(errorMessage || tx('生成支付二维码失败', 'Failed to generate the payment QR code'));
     } finally {
       setPreparing(false);
     }
@@ -990,14 +997,14 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
     try {
       const response = await api.post(`/payments/wechat/confirm/${orderId}`);
       setOrder(response.data.data as Order);
-      message.success('支付已确认，订单已进入待分配状态。');
+      message.success(tx('支付已确认，订单已进入待分配状态。', 'Payment confirmed. The order is now waiting for assignment.'));
       await refreshData();
     } catch (error: unknown) {
       const errorMessage =
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || '确认支付失败');
+      message.error(errorMessage || tx('确认支付失败', 'Failed to confirm payment'));
     } finally {
       setPreparing(false);
     }
@@ -1024,7 +1031,7 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
         setPaymentMode(response.data.data.paymentMode as PaymentMode);
 
         if (latestOrder.paymentStatus === '已支付') {
-          message.success('支付成功，订单已更新。');
+          message.success(tx('支付成功，订单已更新。', 'Payment successful. The order has been updated.'));
           await refreshData();
         }
       } catch {
@@ -1038,7 +1045,7 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
   }, [order, refreshData]);
 
   if (!currentUser) {
-    return <AccessDeniedCard title="请先登录后支付" description="支付页需要识别当前订单的归属用户。" />;
+    return <AccessDeniedCard title={tx('请先登录后支付', 'Please sign in before paying')} description={tx('支付页需要识别当前订单的归属用户。', 'The payment page needs to know which user owns the order.')} />;
   }
 
   if (loading) {
@@ -1052,7 +1059,7 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
   }
 
   if (!order) {
-    return <AccessDeniedCard title="订单不存在" description="可能订单号无效，或者你没有权限查看这个支付页面。" />;
+    return <AccessDeniedCard title={tx('订单不存在', 'Order not found')} description={tx('可能订单号无效，或者你没有权限查看这个支付页面。', 'The order number may be invalid, or you may not have permission to view this payment page.')} />;
   }
 
   if (order.paymentMethod !== '微信支付') {
@@ -1060,9 +1067,9 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
       <Card className="glass-card">
         <Result
           status="info"
-          title="该订单不需要微信支付"
-          subTitle="当前订单使用的不是微信支付方式。"
-          extra={<Button type="primary" onClick={() => navigate('/user')}>返回个人中心</Button>}
+          title={tx('该订单不需要微信支付', 'This order does not use WeChat Pay')}
+          subTitle={tx('当前订单使用的不是微信支付方式。', 'The current order is using another payment method.')}
+          extra={<Button type="primary" onClick={() => navigate('/user')}>{tx('返回个人中心', 'Back to my orders')}</Button>}
         />
       </Card>
     );
@@ -1078,14 +1085,14 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
           {isPaid ? (
             <Result
               status="success"
-              title="支付成功"
-              subTitle={`订单 ${order.orderNo} 已完成付款，工程师和系统都能看到它了。`}
+              title={tx('支付成功', 'Payment successful')}
+              subTitle={tx(`订单 ${order.orderNo} 已完成付款，工程师和系统都能看到它了。`, `Order ${order.orderNo} has been paid successfully and is now visible to both engineers and the platform.`)}
               extra={[
                 <Button key="user" type="primary" onClick={() => navigate('/user')}>
-                  查看我的订单
+                  {tx('查看我的订单', 'View my orders')}
                 </Button>,
                 <Button key="booking" onClick={() => navigate('/booking')}>
-                  再下一单
+                  {tx('再下一单', 'Place another order')}
                 </Button>
               ]}
             />
@@ -1093,20 +1100,20 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
             <Space direction="vertical" size={20} style={{ width: '100%' }}>
               <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
                 <div>
-                  <Title level={2} style={{ marginBottom: 4 }}>支付订单</Title>
-                  <Text type="secondary">专属客户支付界面：可生成二维码、继续支付、查看支付状态。</Text>
+                  <Title level={2} style={{ marginBottom: 4 }}>{tx('支付订单', 'Pay for order')}</Title>
+                  <Text type="secondary">{tx('专属客户支付界面：可生成二维码、继续支付、查看支付状态。', 'Customer payment page: generate QR codes, continue payment, and monitor status updates.')}</Text>
                 </div>
-                <Tag color={paymentStatusColors[order.paymentStatus]}>{order.paymentStatus}</Tag>
+                <Tag color={paymentStatusColors[order.paymentStatus]}>{t(order.paymentStatus)}</Tag>
               </Flex>
 
               <Descriptions column={{ xs: 1, md: 2 }} bordered>
-                <Descriptions.Item label="订单号">{order.orderNo}</Descriptions.Item>
-                <Descriptions.Item label="金额">{currencyFormatter.format(order.totalAmount)}</Descriptions.Item>
-                <Descriptions.Item label="设备型号">{order.deviceModel}</Descriptions.Item>
-                <Descriptions.Item label="预约时间">{order.appointmentTime}</Descriptions.Item>
-                <Descriptions.Item label="支付方式">{order.paymentMethod}</Descriptions.Item>
-                <Descriptions.Item label="支付模式">
-                  <Tag color={paymentMode === 'live' ? 'green' : 'gold'}>{paymentMode === 'live' ? '微信商户直连支付' : '微信收款码支付'}</Tag>
+                <Descriptions.Item label={tx('订单号', 'Order number')}>{order.orderNo}</Descriptions.Item>
+                <Descriptions.Item label={tx('金额', 'Amount')}>{currencyFormatter.format(order.totalAmount)}</Descriptions.Item>
+                <Descriptions.Item label={tx('设备型号', 'Device model')}>{order.deviceModel}</Descriptions.Item>
+                <Descriptions.Item label={tx('预约时间', 'Appointment time')}>{order.appointmentTime}</Descriptions.Item>
+                <Descriptions.Item label={tx('支付方式', 'Payment method')}>{t(order.paymentMethod)}</Descriptions.Item>
+                <Descriptions.Item label={tx('支付模式', 'Payment mode')}>
+                  <Tag color={paymentMode === 'live' ? 'green' : 'gold'}>{t(paymentMode === 'live' ? '微信商户直连支付' : '微信收款码支付')}</Tag>
                 </Descriptions.Item>
               </Descriptions>
 
@@ -1114,7 +1121,7 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
                 <Alert
                   type={paymentMode === 'live' ? 'success' : 'info'}
                   showIcon
-                  message={paymentMode === 'live' ? '已连接微信支付商户配置' : '当前使用微信收款码支付'}
+                  message={paymentMode === 'live' ? tx('已连接微信支付商户配置', 'WeChat merchant configuration detected') : tx('当前使用微信收款码支付', 'Using static WeChat QR payment')}
                   description={readiness.message}
                 />
               ) : null}
@@ -1123,8 +1130,8 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
                 <Alert
                   type="warning"
                   showIcon
-                  message="未检测到本地微信收款码图片"
-                  description="请将你的微信收款码图片放到 client/public/images/payments/wechat-pay-qr.png，支付页就会使用这张图片作为微信支付方式展示。"
+                  message={tx('未检测到本地微信收款码图片', 'Local WeChat QR image not found')}
+                  description={tx('请将你的微信收款码图片放到 client/public/images/payments/wechat-pay-qr.png，支付页就会使用这张图片作为微信支付方式展示。', 'Place your WeChat QR image at client/public/images/payments/wechat-pay-qr.png and the payment page will display it as the WeChat payment method.')}
                 />
               ) : null}
 
@@ -1133,33 +1140,33 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
                   <img
                     className="payment-qr-image"
                     src={manualWechatPayQrImage}
-                    alt="微信支付收款二维码"
+                    alt={tx('微信支付收款二维码', 'WeChat payment QR code')}
                     onError={() => setCustomQrImageUnavailable(true)}
                   />
                 ) : paymentMode === 'live' && codeUrl ? (
                   <QRCode value={codeUrl} size={220} />
                 ) : (
-                  <Alert type="info" showIcon message={paymentMode === 'live' ? '尚未生成支付二维码' : '请先放入微信收款码图片'} />
+                  <Alert type="info" showIcon message={paymentMode === 'live' ? tx('尚未生成支付二维码', 'Payment QR code has not been generated yet') : tx('请先放入微信收款码图片', 'Please add the WeChat QR image first')} />
                 )}
                 <Space wrap>
                   {paymentMode === 'live' ? (
                     <Button type="primary" icon={<QrcodeOutlined />} loading={preparing} onClick={() => void preparePayment()}>
-                      {codeUrl ? '重新获取二维码' : '生成支付二维码'}
+                      {codeUrl ? tx('重新获取二维码', 'Refresh QR code') : tx('生成支付二维码', 'Generate QR code')}
                     </Button>
                   ) : null}
                   {paymentMode === 'manual' ? (
                     <Button type="primary" loading={preparing} onClick={() => void confirmManualPayment()}>
-                      我已完成支付
+                      {tx('我已完成支付', 'I have completed payment')}
                     </Button>
                   ) : null}
-                  <Button onClick={() => void fetchPaymentData()}>刷新支付状态</Button>
+                  <Button onClick={() => void fetchPaymentData()}>{tx('刷新支付状态', 'Refresh payment status')}</Button>
                 </Space>
                 <Text type="secondary">
                   {paymentMode === 'live'
-                    ? '请使用微信扫一扫完成支付，支付成功后页面会自动更新。'
+                    ? tx('请使用微信扫一扫完成支付，支付成功后页面会自动更新。', 'Please use WeChat Scan to pay. The page will update automatically after payment succeeds.')
                     : shouldShowManualWechatQr
-                      ? '当前展示的是你放在 public 目录下的微信收款码图片；用户完成扫码支付后，请点击“我已完成支付”通知平台。'
-                      : '请先将微信收款码图片放到 public 目录，之后用户即可通过该二维码进行微信支付。'}
+                      ? tx('当前展示的是你放在 public 目录下的微信收款码图片；用户完成扫码支付后，请点击“我已完成支付”通知平台。', 'The image shown here is the WeChat QR code from your public directory. After the user scans and pays, click “I have completed payment” to notify the platform.')
+                      : tx('请先将微信收款码图片放到 public 目录，之后用户即可通过该二维码进行微信支付。', 'Please place the WeChat QR image in the public directory first. After that, users can pay with that QR code.')}
                 </Text>
               </Flex>
             </Space>
@@ -1168,13 +1175,13 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
       </Col>
       <Col xs={24} lg={8}>
         <Card className="glass-card">
-          <Title level={4}>支付流程说明</Title>
+          <Title level={4}>{tx('支付流程说明', 'Payment flow')}</Title>
           <Timeline
             items={[
-              { children: '订单创建后进入待支付状态' },
-              { children: '客户进入支付页查看微信收款码' },
-              { children: '微信扫码支付并点击“我已完成支付”' },
-              { children: '支付成功后订单进入待分配状态' }
+              { children: tx('订单创建后进入待支付状态', 'After creation, the order enters pending payment status') },
+              { children: tx('客户进入支付页查看微信收款码', 'The customer opens the payment page and views the WeChat QR code') },
+              { children: tx('微信扫码支付并点击“我已完成支付”', 'The customer scans with WeChat and then clicks “I have completed payment”') },
+              { children: tx('支付成功后订单进入待分配状态', 'After payment, the order moves to awaiting assignment') }
             ]}
           />
         </Card>
@@ -1185,26 +1192,27 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
 
 function UserCenterPage({ currentUser, orders, repairItems, refreshData }: { currentUser: AuthUser | null; orders: Order[]; repairItems: RepairItem[]; refreshData: () => Promise<void> }) {
   const navigate = useNavigate();
+  const { t, tx } = useLanguage();
 
   if (!currentUser) {
-    return <AccessDeniedCard title="请先登录后查看订单" description="个人中心只展示当前登录客户自己的订单。" />;
+    return <AccessDeniedCard title={tx('请先登录后查看订单', 'Please sign in to view your orders')} description={tx('个人中心只展示当前登录客户自己的订单。', 'The personal center only shows orders that belong to the currently signed-in customer.')} />;
   }
 
   if (currentUser.role !== 'customer' && currentUser.role !== 'admin') {
-    return <AccessDeniedCard title="当前身份没有个人订单中心" description="工程师账号请前往工程师端查看待接单与我的服务单。" />;
+    return <AccessDeniedCard title={tx('当前身份没有个人订单中心', 'This role does not have a customer order center')} description={tx('工程师账号请前往工程师端查看待接单与我的服务单。', 'Engineer accounts should use the engineer console to view open jobs and assigned service orders.')} />;
   }
 
   const cancelOrder = async (orderId: number) => {
     try {
       await api.put(`/orders/${orderId}/cancel`);
-      message.success('订单已取消');
+      message.success(tx('订单已取消', 'Order cancelled'));
       await refreshData();
     } catch (error: unknown) {
       const errorMessage =
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || '取消订单失败');
+      message.error(errorMessage || tx('取消订单失败', 'Failed to cancel the order'));
     }
   };
 
@@ -1213,20 +1221,20 @@ function UserCenterPage({ currentUser, orders, repairItems, refreshData }: { cur
       <Card className="glass-card">
         <Row gutter={[16, 16]}>
           <Col xs={24} md={8}>
-            <Statistic title="我的订单" value={orders.length} />
+            <Statistic title={tx('我的订单', 'My orders')} value={orders.length} />
           </Col>
           <Col xs={24} md={8}>
-            <Statistic title="待处理订单" value={orders.filter((order) => order.status !== '已完成' && order.status !== '已取消').length} />
+            <Statistic title={tx('待处理订单', 'Open orders')} value={orders.filter((order) => order.status !== '已完成' && order.status !== '已取消').length} />
           </Col>
           <Col xs={24} md={8}>
-            <Statistic title="待支付订单" value={orders.filter((order) => order.paymentStatus !== '已支付').length} />
+            <Statistic title={tx('待支付订单', 'Pending payment orders')} value={orders.filter((order) => order.paymentStatus !== '已支付').length} />
           </Col>
         </Row>
       </Card>
 
       {orders.length === 0 ? (
         <Card className="glass-card">
-          <Empty description="暂无订单，快去预约一台受伤的电子设备吧。" />
+          <Empty description={tx('暂无订单，快去预约一台受伤的电子设备吧。', 'No orders yet—go book a repair for a slightly battle-damaged device.')} />
         </Card>
       ) : (
         orders.map((order) => {
@@ -1236,32 +1244,32 @@ function UserCenterPage({ currentUser, orders, repairItems, refreshData }: { cur
               <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
                 <div>
                   <Title level={4} style={{ marginBottom: 0 }}>
-                    {item?.name ?? '维修订单'}
+                    {item ? t(item.name) : tx('维修订单', 'Repair order')}
                   </Title>
-                  <Text type="secondary">订单号：{order.orderNo}</Text>
+                  <Text type="secondary">{tx('订单号：', 'Order number: ')}{order.orderNo}</Text>
                 </div>
                 <Space wrap>
-                  <Tag color={statusColors[order.status]}>{order.status}</Tag>
-                  <Tag color={paymentStatusColors[order.paymentStatus]}>{order.paymentStatus}</Tag>
+                  <Tag color={statusColors[order.status]}>{t(order.status)}</Tag>
+                  <Tag color={paymentStatusColors[order.paymentStatus]}>{t(order.paymentStatus)}</Tag>
                 </Space>
               </Flex>
               <Progress percent={getOrderProgress(order.status)} strokeColor="#ff7a00" showInfo={false} style={{ margin: '18px 0' }} />
               <Descriptions column={{ xs: 1, sm: 2, lg: 4 }}>
-                <Descriptions.Item label="设备型号">{order.deviceModel}</Descriptions.Item>
-                <Descriptions.Item label="预约时间">{order.appointmentTime}</Descriptions.Item>
-                <Descriptions.Item label="支付方式">{order.paymentMethod}</Descriptions.Item>
-                <Descriptions.Item label="金额">{currencyFormatter.format(order.totalAmount)}</Descriptions.Item>
-                <Descriptions.Item label="地址" span={4}>{order.address}</Descriptions.Item>
-                <Descriptions.Item label="问题描述" span={4}>{order.problemDesc}</Descriptions.Item>
+                <Descriptions.Item label={tx('设备型号', 'Device model')}>{order.deviceModel}</Descriptions.Item>
+                <Descriptions.Item label={tx('预约时间', 'Appointment time')}>{order.appointmentTime}</Descriptions.Item>
+                <Descriptions.Item label={tx('支付方式', 'Payment method')}>{t(order.paymentMethod)}</Descriptions.Item>
+                <Descriptions.Item label={tx('金额', 'Amount')}>{currencyFormatter.format(order.totalAmount)}</Descriptions.Item>
+                <Descriptions.Item label={tx('地址', 'Address')} span={4}>{order.address}</Descriptions.Item>
+                <Descriptions.Item label={tx('问题描述', 'Issue description')} span={4}>{order.problemDesc}</Descriptions.Item>
               </Descriptions>
               <Space wrap style={{ marginTop: 16 }}>
                 {order.paymentMethod === '微信支付' && order.paymentStatus !== '已支付' ? (
                   <Button type="primary" onClick={() => navigate(`/payment/${order.id}`)}>
-                    继续支付
+                    {tx('继续支付', 'Continue payment')}
                   </Button>
                 ) : null}
                 {order.status !== '已取消' && order.status !== '已完成' ? (
-                  <Button danger onClick={() => void cancelOrder(order.id)}>取消订单</Button>
+                  <Button danger onClick={() => void cancelOrder(order.id)}>{tx('取消订单', 'Cancel order')}</Button>
                 ) : null}
               </Space>
             </Card>
@@ -1273,12 +1281,13 @@ function UserCenterPage({ currentUser, orders, repairItems, refreshData }: { cur
 }
 
 function EngineerPage({ currentUser, orders, refreshOrders, deviceTypes, repairItems }: { currentUser: AuthUser | null; orders: Order[]; refreshOrders: () => Promise<void>; deviceTypes: DeviceType[]; repairItems: RepairItem[] }) {
+  const { t, tx } = useLanguage();
   if (!currentUser) {
-    return <AccessDeniedCard title="请先登录工程师账号" description="工程师端需要登录后才能查看待接单和我的服务单。" />;
+    return <AccessDeniedCard title={tx('请先登录工程师账号', 'Please sign in with an engineer account')} description={tx('工程师端需要登录后才能查看待接单和我的服务单。', 'The engineer console requires sign-in before you can view open jobs and assigned service orders.')} />;
   }
 
   if (currentUser.role !== 'engineer' && currentUser.role !== 'admin') {
-    return <AccessDeniedCard title="当前身份无法进入工程师端" description="请使用工程师身份注册或登录。" />;
+    return <AccessDeniedCard title={tx('当前身份无法进入工程师端', 'This role cannot access the engineer console')} description={tx('请使用工程师身份注册或登录。', 'Please sign in or register using an engineer account.')} />;
   }
 
   const activeEngineer = currentUser.engineerProfile ?? fallbackEngineers[0];
@@ -1294,14 +1303,14 @@ function EngineerPage({ currentUser, orders, refreshOrders, deviceTypes, repairI
       } else {
         await api.put(`/engineer/orders/${orderId}/${action}`);
       }
-      message.success('操作成功');
+      message.success(tx('操作成功', 'Action completed successfully'));
       await refreshOrders();
     } catch (error: unknown) {
       const errorMessage =
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || '工程师操作失败');
+      message.error(errorMessage || tx('工程师操作失败', 'Engineer action failed'));
     }
   };
 
@@ -1313,12 +1322,12 @@ function EngineerPage({ currentUser, orders, refreshOrders, deviceTypes, repairI
       <Card className="glass-card" key={order.id}>
         <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
           <div>
-            <Title level={4} style={{ marginBottom: 4 }}>{serviceName}</Title>
-            <Text type="secondary">订单号：{order.orderNo} · {deviceTypeName} / {order.deviceModel}</Text>
+            <Title level={4} style={{ marginBottom: 4 }}>{t(serviceName)}</Title>
+            <Text type="secondary">{tx('订单号：', 'Order number: ')}{order.orderNo} · {t(deviceTypeName)} / {order.deviceModel}</Text>
           </div>
           <Space wrap>
-            <Tag color={statusColors[order.status]}>{order.status}</Tag>
-            <Tag color={paymentStatusColors[order.paymentStatus]}>{order.paymentStatus}</Tag>
+            <Tag color={statusColors[order.status]}>{t(order.status)}</Tag>
+            <Tag color={paymentStatusColors[order.paymentStatus]}>{t(order.paymentStatus)}</Tag>
             <Tag color="orange">{currencyFormatter.format(order.totalAmount)}</Tag>
           </Space>
         </Flex>
@@ -1328,31 +1337,31 @@ function EngineerPage({ currentUser, orders, refreshOrders, deviceTypes, repairI
         <Row gutter={[16, 16]}>
           <Col xs={24} xl={16}>
             <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
-              <Descriptions.Item label="服务项目">{serviceName}</Descriptions.Item>
-              <Descriptions.Item label="设备类型">{deviceTypeName}</Descriptions.Item>
-              <Descriptions.Item label="设备型号">{order.deviceModel}</Descriptions.Item>
-              <Descriptions.Item label="预约时间">{order.appointmentTime}</Descriptions.Item>
-              <Descriptions.Item label="客户昵称">{order.customerNickname ?? '平台用户'}</Descriptions.Item>
-              <Descriptions.Item label="联系电话">{order.customerPhone ?? '平台统一协调'}</Descriptions.Item>
-              <Descriptions.Item label="订单金额">{currencyFormatter.format(order.totalAmount)}</Descriptions.Item>
-              <Descriptions.Item label="支付状态">{order.paymentStatus}</Descriptions.Item>
-              <Descriptions.Item label="上门地址" span={2}>{order.address}</Descriptions.Item>
+              <Descriptions.Item label={tx('服务项目', 'Service')}>{t(serviceName)}</Descriptions.Item>
+              <Descriptions.Item label={tx('设备类型', 'Device type')}>{t(deviceTypeName)}</Descriptions.Item>
+              <Descriptions.Item label={tx('设备型号', 'Device model')}>{order.deviceModel}</Descriptions.Item>
+              <Descriptions.Item label={tx('预约时间', 'Appointment time')}>{order.appointmentTime}</Descriptions.Item>
+              <Descriptions.Item label={tx('客户昵称', 'Customer name')}>{order.customerNickname ?? t('平台用户')}</Descriptions.Item>
+              <Descriptions.Item label={tx('联系电话', 'Phone number')}>{order.customerPhone ?? t('平台统一协调')}</Descriptions.Item>
+              <Descriptions.Item label={tx('订单金额', 'Order amount')}>{currencyFormatter.format(order.totalAmount)}</Descriptions.Item>
+              <Descriptions.Item label={tx('支付状态', 'Payment status')}>{t(order.paymentStatus)}</Descriptions.Item>
+              <Descriptions.Item label={tx('上门地址', 'Service address')} span={2}>{order.address}</Descriptions.Item>
             </Descriptions>
           </Col>
           <Col xs={24} xl={8}>
             <Space direction="vertical" size={12} style={{ width: '100%' }}>
               <Card bordered={false} style={{ background: '#fff7e8', height: '100%' }}>
                 <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                  <Text strong>维修需求</Text>
+                  <Text strong>{tx('维修需求', 'Repair request')}</Text>
                   <Text>{order.problemDesc}</Text>
-                  <Text type="secondary">建议工程师提前确认故障范围、所需工具及上门路线，避免现场“带错装备”的经典剧情。</Text>
+                  <Text type="secondary">{tx('建议工程师提前确认故障范围、所需工具及上门路线，避免现场“带错装备”的经典剧情。', 'Engineers should confirm the fault scope, required tools, and visit route in advance to avoid the classic onsite plot twist of bringing the wrong gear.')}</Text>
                 </Space>
               </Card>
               <InteractiveMapPreview
-                title="订单位置地图"
+                title={tx('订单位置地图', 'Order location map')}
                 query={order.address}
-                helperText="根据客户填写的上门地址展示演示级地图位置。"
-                emptyText="该订单暂未填写上门地址。"
+                helperText={tx('根据客户填写的上门地址展示演示级地图位置。', 'Shows a demo-level map location based on the customer’s service address.')}
+                emptyText={tx('该订单暂未填写上门地址。', 'This order does not have a service address yet.')}
                 height={260}
               />
             </Space>
@@ -1360,9 +1369,9 @@ function EngineerPage({ currentUser, orders, refreshOrders, deviceTypes, repairI
         </Row>
 
         <Space wrap style={{ marginTop: 18 }}>
-          {order.status === '待分配' ? <Button type="primary" onClick={() => void updateOrder(order.id, 'accept')}>抢单</Button> : null}
-          {order.status === '待上门' ? <Button onClick={() => void updateOrder(order.id, 'start')}>开始服务</Button> : null}
-          {order.status === '服务中' ? <Button type="primary" onClick={() => void updateOrder(order.id, 'complete')}>完成服务</Button> : null}
+          {order.status === '待分配' ? <Button type="primary" onClick={() => void updateOrder(order.id, 'accept')}>{tx('抢单', 'Accept order')}</Button> : null}
+          {order.status === '待上门' ? <Button onClick={() => void updateOrder(order.id, 'start')}>{tx('开始服务', 'Start service')}</Button> : null}
+          {order.status === '服务中' ? <Button type="primary" onClick={() => void updateOrder(order.id, 'complete')}>{tx('完成服务', 'Complete service')}</Button> : null}
         </Space>
       </Card>
     );
@@ -1387,48 +1396,48 @@ function EngineerPage({ currentUser, orders, refreshOrders, deviceTypes, repairI
             <Flex gap={16} align="center">
               <Avatar size={72} src={activeEngineer.avatar} icon={<UserOutlined />} />
               <div>
-                <Title level={3} style={{ marginBottom: 4 }}>{activeEngineer.realName} 的工作台</Title>
-                <Text type="secondary">{activeEngineer.skillDesc}</Text>
+                <Title level={3} style={{ marginBottom: 4 }}>{tx(`${activeEngineer.realName} 的工作台`, `${activeEngineer.realName}’s workbench`)}</Title>
+                <Text type="secondary">{t(activeEngineer.skillDesc)}</Text>
                 <div style={{ marginTop: 6 }}>
-                  <Text type="secondary">本页只保留工程师最关心的订单信息：客户需求、地址、时间、支付状态与处理动作。</Text>
+                  <Text type="secondary">{tx('本页只保留工程师最关心的订单信息：客户需求、地址、时间、支付状态与处理动作。', 'This page keeps only the information engineers care about most: customer needs, address, time, payment status, and action buttons.')}</Text>
                 </div>
               </div>
             </Flex>
           </Col>
           <Col xs={24} md={8}>
             <Row gutter={[12, 12]}>
-              <Col span={12}><Statistic title="待抢单" value={availableOrders.length} /></Col>
-              <Col span={12}><Statistic title="进行中" value={activeOrders.length} /></Col>
-              <Col span={12}><Statistic title="待评价" value={followUpOrders.filter((order) => order.status === '待评价').length} /></Col>
-              <Col span={12}><Statistic title="累计订单" value={activeEngineer.totalOrders} /></Col>
+              <Col span={12}><Statistic title={tx('待抢单', 'Open orders')} value={availableOrders.length} /></Col>
+              <Col span={12}><Statistic title={tx('进行中', 'In progress')} value={activeOrders.length} /></Col>
+              <Col span={12}><Statistic title={tx('待评价', 'Awaiting review')} value={followUpOrders.filter((order) => order.status === '待评价').length} /></Col>
+              <Col span={12}><Statistic title={tx('累计订单', 'Total orders')} value={activeEngineer.totalOrders} /></Col>
             </Row>
           </Col>
         </Row>
       </Card>
 
       <InteractiveMapPreview
-        title="工程师服务区域地图"
+        title={tx('工程师服务区域地图', 'Engineer service area map')}
         query={activeEngineer.serviceArea}
-        helperText="根据工程师填写的服务区域展示一个演示级地图位置，方便快速判断接单范围。"
-        emptyText="工程师尚未填写服务区域，因此暂时无法展示地图。"
+        helperText={tx('根据工程师填写的服务区域展示一个演示级地图位置，方便快速判断接单范围。', 'Shows a demo-level map based on the engineer’s service area so coverage can be assessed quickly.')}
+        emptyText={tx('工程师尚未填写服务区域，因此暂时无法展示地图。', 'The engineer has not filled in a service area yet, so no map can be shown for now.')}
       />
 
       <Tabs
         items={[
           {
             key: 'available',
-            label: `待抢单 (${availableOrders.length})`,
-            children: renderOrderSection(availableOrders, '当前暂无待抢单订单。')
+            label: tx(`待抢单 (${availableOrders.length})`, `Open orders (${availableOrders.length})`),
+            children: renderOrderSection(availableOrders, tx('当前暂无待抢单订单。', 'There are no open orders right now.'))
           },
           {
             key: 'active',
-            label: `我的进行中 (${activeOrders.length})`,
-            children: renderOrderSection(activeOrders, '当前没有进行中的服务订单。')
+            label: tx(`我的进行中 (${activeOrders.length})`, `My active orders (${activeOrders.length})`),
+            children: renderOrderSection(activeOrders, tx('当前没有进行中的服务订单。', 'There are no active service orders right now.'))
           },
           {
             key: 'follow-up',
-            label: `待评价 / 历史 (${followUpOrders.length})`,
-            children: renderOrderSection(followUpOrders, '当前没有待跟进或历史订单。')
+            label: tx(`待评价 / 历史 (${followUpOrders.length})`, `Review / History (${followUpOrders.length})`),
+            children: renderOrderSection(followUpOrders, tx('当前没有待跟进或历史订单。', 'There are no follow-up or historical orders right now.'))
           }
         ]}
       />
@@ -1437,8 +1446,9 @@ function EngineerPage({ currentUser, orders, refreshOrders, deviceTypes, repairI
 }
 
 function AdminPage({ currentUser, orders, engineers, repairItems, deviceTypes, refreshOrders }: { currentUser: AuthUser | null; orders: Order[]; engineers: Engineer[]; repairItems: RepairItem[]; deviceTypes: DeviceType[]; refreshOrders: () => Promise<void> }) {
+  const { t, tx } = useLanguage();
   if (!currentUser || currentUser.role !== 'admin') {
-    return <AccessDeniedCard title="需要管理员权限" description="管理后台只对管理员账号开放。" />;
+    return <AccessDeniedCard title={tx('需要管理员权限', 'Administrator access required')} description={tx('管理后台只对管理员账号开放。', 'The admin panel is only available to administrator accounts.')} />;
   }
 
   const totalRevenue = orders.filter((order) => order.status !== '已取消').reduce((sum, order) => sum + order.totalAmount, 0);
@@ -1446,50 +1456,50 @@ function AdminPage({ currentUser, orders, engineers, repairItems, deviceTypes, r
   const assignEngineer = async (orderId: number, engineerId: number) => {
     try {
       await api.put(`/admin/orders/${orderId}/assign`, { engineerId });
-      message.success('指派成功');
+      message.success(tx('指派成功', 'Engineer assigned successfully'));
       await refreshOrders();
     } catch (error: unknown) {
       const errorMessage =
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || '指派失败');
+      message.error(errorMessage || tx('指派失败', 'Failed to assign engineer'));
     }
   };
 
   return (
     <Space direction="vertical" size={20} style={{ width: '100%' }}>
       <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} lg={6}><Card className="glass-card"><Statistic title="总订单数" value={orders.length} /></Card></Col>
-        <Col xs={24} sm={12} lg={6}><Card className="glass-card"><Statistic title="平台收入" value={currencyFormatter.format(totalRevenue)} /></Card></Col>
-        <Col xs={24} sm={12} lg={6}><Card className="glass-card"><Statistic title="客户数" value={orders.map((order) => order.userId).filter((value, index, array) => array.indexOf(value) === index).length} /></Card></Col>
-        <Col xs={24} sm={12} lg={6}><Card className="glass-card"><Statistic title="工程师数" value={engineers.length} /></Card></Col>
+        <Col xs={24} sm={12} lg={6}><Card className="glass-card"><Statistic title={tx('总订单数', 'Total orders')} value={orders.length} /></Card></Col>
+        <Col xs={24} sm={12} lg={6}><Card className="glass-card"><Statistic title={tx('平台收入', 'Platform revenue')} value={currencyFormatter.format(totalRevenue)} /></Card></Col>
+        <Col xs={24} sm={12} lg={6}><Card className="glass-card"><Statistic title={tx('客户数', 'Customers')} value={orders.map((order) => order.userId).filter((value, index, array) => array.indexOf(value) === index).length} /></Card></Col>
+        <Col xs={24} sm={12} lg={6}><Card className="glass-card"><Statistic title={tx('工程师数', 'Engineers')} value={engineers.length} /></Card></Col>
       </Row>
 
       <Card className="glass-card">
-        <Title level={3}>订单管理</Title>
+        <Title level={3}>{tx('订单管理', 'Order management')}</Title>
         <Table
           rowKey="id"
           dataSource={orders}
           pagination={{ pageSize: 5 }}
           columns={[
-            { title: '订单号', dataIndex: 'orderNo' },
+            { title: tx('订单号', 'Order number'), dataIndex: 'orderNo' },
             {
-              title: '设备',
-              render: (_, order: Order) => `${findDeviceName(deviceTypes, order.deviceTypeId)} / ${findRepairItem(repairItems, order.repairItemId)?.name ?? '未知服务'}`
+              title: tx('设备', 'Device'),
+              render: (_, order: Order) => `${t(findDeviceName(deviceTypes, order.deviceTypeId))} / ${t(findRepairItem(repairItems, order.repairItemId)?.name ?? '未知服务')}`
             },
-            { title: '预约时间', dataIndex: 'appointmentTime' },
-            { title: '支付状态', render: (_, order: Order) => <Tag color={paymentStatusColors[order.paymentStatus]}>{order.paymentStatus}</Tag> },
-            { title: '订单状态', render: (_, order: Order) => <Tag color={statusColors[order.status]}>{order.status}</Tag> },
+            { title: tx('预约时间', 'Appointment time'), dataIndex: 'appointmentTime' },
+            { title: tx('支付状态', 'Payment status'), render: (_, order: Order) => <Tag color={paymentStatusColors[order.paymentStatus]}>{t(order.paymentStatus)}</Tag> },
+            { title: tx('订单状态', 'Order status'), render: (_, order: Order) => <Tag color={statusColors[order.status]}>{t(order.status)}</Tag> },
             {
-              title: '工程师',
-              render: (_, order: Order) => engineers.find((engineer) => engineer.id === order.engineerId)?.realName ?? '未分配'
+              title: tx('工程师', 'Engineer'),
+              render: (_, order: Order) => engineers.find((engineer) => engineer.id === order.engineerId)?.realName ?? t('未分配')
             },
             {
-              title: '指派',
+              title: tx('指派', 'Assign'),
               render: (_, order: Order) => (
                 <Select
-                  placeholder="选择工程师"
+                  placeholder={tx('选择工程师', 'Choose an engineer')}
                   style={{ minWidth: 140 }}
                   onChange={(value) => void assignEngineer(order.id, value)}
                   options={engineers.map((engineer) => ({ label: engineer.realName, value: engineer.id }))}
@@ -1506,6 +1516,7 @@ function AdminPage({ currentUser, orders, engineers, repairItems, deviceTypes, r
 function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { language, setLanguage, t, tx } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [authReady, setAuthReady] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
@@ -1544,9 +1555,9 @@ function AppContent() {
       }
     } catch (error) {
       if (!currentUser) {
-        message.warning('已加载本地演示数据；如需联调，请先启动后端服务。');
+        message.warning(tx('已加载本地演示数据；如需联调，请先启动后端服务。', 'Loaded local demo data. If you want full integration, please start the backend server first.'));
       } else {
-        message.error('加载用户数据失败，请重新登录。');
+        message.error(tx('加载用户数据失败，请重新登录。', 'Failed to load user data. Please sign in again.'));
         clearSession();
       }
     } finally {
@@ -1586,30 +1597,30 @@ function AppContent() {
 
   const logout = () => {
     clearSession();
-    message.success('已退出登录');
+    message.success(tx('已退出登录', 'Signed out successfully'));
     navigate('/');
   };
 
   const isEngineerOnly = currentUser?.role === 'engineer';
 
   const navigationItems = isEngineerOnly
-    ? [{ key: '/engineer', icon: <ToolOutlined />, label: <Link to="/engineer">订单工作台</Link> }]
+    ? [{ key: '/engineer', icon: <ToolOutlined />, label: <Link to="/engineer">{tx('订单工作台', 'Order workbench')}</Link> }]
     : [
-        { key: '/', icon: <DashboardOutlined />, label: <Link to="/">首页</Link> },
-        { key: '/services', icon: <LaptopOutlined />, label: <Link to="/services">服务列表</Link> },
+        { key: '/', icon: <DashboardOutlined />, label: <Link to="/">{tx('首页', 'Home')}</Link> },
+        { key: '/services', icon: <LaptopOutlined />, label: <Link to="/services">{tx('服务列表', 'Services')}</Link> },
         ...(currentUser && (currentUser.role === 'customer' || currentUser.role === 'admin')
-          ? [{ key: '/booking', icon: <CalendarOutlined />, label: <Link to="/booking">预约下单</Link> }]
+          ? [{ key: '/booking', icon: <CalendarOutlined />, label: <Link to="/booking">{tx('预约下单', 'Book service')}</Link> }]
           : []),
         ...(currentUser && (currentUser.role === 'customer' || currentUser.role === 'admin')
-          ? [{ key: '/user', icon: <UserOutlined />, label: <Link to="/user">个人中心</Link> }]
+          ? [{ key: '/user', icon: <UserOutlined />, label: <Link to="/user">{tx('个人中心', 'My orders')}</Link> }]
           : []),
         ...(currentUser && (currentUser.role === 'engineer' || currentUser.role === 'admin')
-          ? [{ key: '/engineer', icon: <ToolOutlined />, label: <Link to="/engineer">工程师端</Link> }]
+          ? [{ key: '/engineer', icon: <ToolOutlined />, label: <Link to="/engineer">{tx('工程师端', 'Engineer console')}</Link> }]
           : []),
         ...(currentUser?.role === 'admin'
-          ? [{ key: '/admin', icon: <SafetyCertificateOutlined />, label: <Link to="/admin">管理后台</Link> }]
+          ? [{ key: '/admin', icon: <SafetyCertificateOutlined />, label: <Link to="/admin">{tx('管理后台', 'Admin panel')}</Link> }]
           : []),
-        ...(!currentUser ? [{ key: '/auth', icon: <LoginOutlined />, label: <Link to="/auth">登录 / 注册</Link> }] : [])
+        ...(!currentUser ? [{ key: '/auth', icon: <LoginOutlined />, label: <Link to="/auth">{tx('登录 / 注册', 'Sign in / Register')}</Link> }] : [])
       ];
 
   const selectedKey = useMemo(() => {
@@ -1634,15 +1645,24 @@ function AppContent() {
               <div className="brand-badge">
                 <PhoneOutlined />
               </div>
-              修达达 Repair+ 平台
+              {tx('修达达 Repair+ 平台', 'Repair+ / 修达达 Platform')}
             </div>
             <Flex align="center" gap={14} style={{ flex: 1, minWidth: 340 }}>
               <Menu mode="horizontal" selectedKeys={[selectedKey]} items={navigationItems} style={{ flex: 1, borderBottom: 'none', background: 'transparent' }} />
+              <Select
+                value={language}
+                onChange={setLanguage}
+                style={{ minWidth: 110 }}
+                options={[
+                  { label: '中文', value: 'zh' },
+                  { label: 'English', value: 'en' }
+                ]}
+              />
               {currentUser ? (
                 <Space>
-                  <Tag color="blue">{getRoleLabel(currentUser.role)}</Tag>
+                  <Tag color="blue">{t(getRoleLabel(currentUser.role))}</Tag>
                   <Text>{currentUser.nickname}</Text>
-                  <Button icon={<LogoutOutlined />} onClick={logout}>退出</Button>
+                  <Button icon={<LogoutOutlined />} onClick={logout}>{tx('退出', 'Sign out')}</Button>
                 </Space>
               ) : null}
             </Flex>
@@ -1671,7 +1691,7 @@ function AppContent() {
           )}
         </div>
       </Content>
-      <Footer className="footer">修达达 MVP · React + TypeScript + Ant Design + Express · {dayjs().format('YYYY-MM-DD')}</Footer>
+      <Footer className="footer">{tx('修达达 MVP', 'Repair+ MVP')} · React + TypeScript + Ant Design + Express · {dayjs().format('YYYY-MM-DD')}</Footer>
     </Layout>
   );
 }
