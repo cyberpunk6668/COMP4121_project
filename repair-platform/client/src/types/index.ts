@@ -51,7 +51,7 @@ export type OrderStatus =
   | '已取消';
 
 export type PaymentStatus = '待支付' | '已支付' | '支付失败';
-export type PaymentMode = 'live' | 'mock';
+export type PaymentMode = 'live' | 'manual';
 
 export interface Order {
   id: number;

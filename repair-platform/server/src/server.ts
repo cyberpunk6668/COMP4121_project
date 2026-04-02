@@ -47,6 +47,8 @@ type TokenPayload = {
   exp: number;
 };
 
+type PaymentMode = 'live' | 'manual';
+
 const app = express();
 const PORT = Number(process.env.PORT || 4000);
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
@@ -100,14 +102,30 @@ function requireAuth(roles?: UserRole[]) {
 }
 
 function getPaymentMode() {
-  const configuredProvider = (process.env.PAYMENT_PROVIDER || 'mock').trim();
+  const configuredProvider = (process.env.PAYMENT_PROVIDER || 'wechat-static-qr').trim();
   const readiness = getWechatPayReadiness();
-  const mode = configuredProvider === 'wechat-native' && readiness.configured ? 'live' : 'mock';
-  return { mode, readiness };
+
+  if (configuredProvider === 'wechat-native' && readiness.configured) {
+    return { mode: 'live' as PaymentMode, readiness };
+  }
+
+  const manualMessage =
+    configuredProvider === 'wechat-native'
+      ? '当前未完成微信商户直连配置，已切换为微信收款码支付。用户扫码完成后，请在页面点击“我已完成支付”。'
+      : '当前使用微信收款码支付。用户扫码完成后，请在页面点击“我已完成支付”。';
+
+  return {
+    mode: 'manual' as PaymentMode,
+    readiness: {
+      enabled: true,
+      configured: true,
+      message: manualMessage
+    }
+  };
 }
 
-function buildMockWechatCodeUrl(orderNo: string) {
-  return `weixin://wxpay/mock/${orderNo}`;
+function buildManualWechatCodeUrl(orderNo: string) {
+  return `weixin://wxpay/manual/${orderNo}`;
 }
 
 app.get('/api/health', (_req: Request, res: Response) => {
@@ -332,7 +350,7 @@ app.post('/api/payments/wechat/native/:orderId', requireAuth(['customer', 'admin
         order,
         codeUrl: order.paymentQrCode,
         paymentMode: getPaymentMode().mode,
-        canMockConfirm: false
+        canManualConfirm: false
       }
     });
   }
@@ -343,7 +361,7 @@ app.post('/api/payments/wechat/native/:orderId', requireAuth(['customer', 'admin
     const codeUrl =
       mode === 'live'
         ? (await createNativeWechatPayment(order)).code_url
-        : order.paymentQrCode || buildMockWechatCodeUrl(order.orderNo);
+        : order.paymentQrCode || buildManualWechatCodeUrl(order.orderNo);
 
     setOrderPaymentQrCode(order, codeUrl);
 
@@ -353,7 +371,7 @@ app.post('/api/payments/wechat/native/:orderId', requireAuth(['customer', 'admin
         order,
         codeUrl,
         paymentMode: mode,
-        canMockConfirm: mode === 'mock',
+        canManualConfirm: mode === 'manual',
         readiness
       }
     });
@@ -377,11 +395,11 @@ app.post('/api/payments/wechat/confirm/:orderId', requireAuth(['customer', 'admi
   }
 
   const { mode } = getPaymentMode();
-  if (mode !== 'mock') {
-    return res.status(400).json({ success: false, message: 'Mock payment confirmation is only available in mock mode.' });
+  if (mode !== 'manual') {
+    return res.status(400).json({ success: false, message: 'Manual confirmation is only available when using the static WeChat QR payment channel.' });
   }
 
-  markOrderAsPaid(order, `mock-${order.orderNo}`);
+  markOrderAsPaid(order, `manual-${order.orderNo}`);
   return res.json({ success: true, data: order });
 });
 

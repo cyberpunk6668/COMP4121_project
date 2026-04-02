@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Col,
+  DatePicker,
   Descriptions,
   Empty,
   Flex,
@@ -45,8 +46,8 @@ import {
   UserOutlined,
   WifiOutlined
 } from '@ant-design/icons';
-import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import dayjs from 'dayjs';
+import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import dayjs, { type Dayjs } from 'dayjs';
 import api from './api/http';
 import {
   fallbackDeviceTypes,
@@ -85,12 +86,42 @@ const paymentStatusColors: Record<Order['paymentStatus'], string> = {
   支付失败: 'red'
 };
 
+const manualWechatPayQrImage = '/images/payments/wechat-pay-qr.png';
+
 function findRepairItem(items: RepairItem[], id: number) {
   return items.find((item) => item.id === id);
 }
 
 function findDeviceName(deviceTypes: DeviceType[], id: number) {
   return deviceTypes.find((item) => item.id === id)?.name ?? '未知设备';
+}
+
+function buildNumberRange(start: number, end: number) {
+  return Array.from({ length: Math.max(end - start, 0) }, (_, index) => start + index);
+}
+
+function disablePastAppointmentDates(current: Dayjs) {
+  return current.endOf('day').isBefore(dayjs());
+}
+
+function getDisabledAppointmentTime(selectedDate?: Dayjs | null) {
+  const now = dayjs();
+  if (!selectedDate || !selectedDate.isSame(now, 'day')) {
+    return {};
+  }
+
+  const currentHour = now.hour();
+  const roundedMinute = now.minute() <= 30 ? 30 : 60;
+
+  return {
+    disabledHours: () => buildNumberRange(0, roundedMinute >= 60 ? currentHour + 1 : currentHour),
+    disabledMinutes: (selectedHour: number) => {
+      if (selectedHour !== currentHour || roundedMinute >= 60) {
+        return [];
+      }
+      return buildNumberRange(0, roundedMinute);
+    }
+  };
 }
 
 function getOrderProgress(status: Order['status']) {
@@ -138,19 +169,28 @@ function getDefaultPathByRole(role: UserRole) {
 }
 
 function AccessDeniedCard({ title, description }: { title: string; description: string }) {
+  const navigate = useNavigate();
+
   return (
     <Card className="glass-card">
       <Result
         status="403"
         title={title}
         subTitle={description}
-        extra={<Button type="primary"><Link to="/auth">前往登录</Link></Button>}
+        extra={
+          <Button type="primary" onClick={() => navigate('/auth')}>
+            前往登录
+          </Button>
+        }
       />
     </Card>
   );
 }
 
 function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { currentUser: AuthUser | null; deviceTypes: DeviceType[]; repairItems: RepairItem[]; engineers: Engineer[] }) {
+  const navigate = useNavigate();
+  const topServices = useMemo(() => repairItems.slice(0, 3), [repairItems]);
+
   return (
     <Space direction="vertical" size={28} style={{ width: '100%' }}>
       <Card className="hero-card" bordered={false}>
@@ -175,11 +215,16 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
               />
             ) : null}
             <Space wrap size="middle">
-              <Button type="primary" size="large" icon={<ToolOutlined />}>
-                <Link to={currentUser ? '/booking' : '/auth'}>{currentUser ? '立即预约维修' : '登录后预约'}</Link>
+              <Button
+                type="primary"
+                size="large"
+                icon={<ToolOutlined />}
+                onClick={() => navigate(currentUser ? '/booking' : '/auth')}
+              >
+                {currentUser ? '立即预约维修' : '登录后预约'}
               </Button>
-              <Button size="large" ghost icon={<WifiOutlined />}>
-                <Link to="/services">查看热门服务</Link>
+              <Button size="large" ghost icon={<WifiOutlined />} onClick={() => navigate('/services')}>
+                查看热门服务
               </Button>
             </Space>
           </Col>
@@ -189,7 +234,7 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
                 <Title level={4} style={{ margin: 0 }}>
                   热门服务速览
                 </Title>
-                {repairItems.slice(0, 3).map((item) => (
+                {topServices.map((item) => (
                   <Flex key={item.id} justify="space-between" align="center">
                     <div>
                       <Text strong>{item.name}</Text>
@@ -249,18 +294,26 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
         <Title level={2} className="section-title">
           热门设备类型
         </Title>
+        <Paragraph type="secondary">点击设备卡片即可查看该设备对应的维修服务，像逛分类页一样丝滑。</Paragraph>
         <Row gutter={[16, 16]}>
           {deviceTypes.map((device) => (
             <Col xs={12} sm={8} lg={6} key={device.id}>
-              <Card className="glass-card" hoverable>
-                <Space direction="vertical" align="center" style={{ width: '100%' }}>
-                  <div style={{ fontSize: 42 }}>{device.icon}</div>
-                  <Title level={4} style={{ margin: 0 }}>
-                    {device.name}
-                  </Title>
-                  <Text type="secondary">常见故障快速预约</Text>
-                </Space>
-              </Card>
+              <button
+                type="button"
+                className="device-card-button"
+                onClick={() => navigate(`/services?deviceTypeId=${device.id}`)}
+                aria-label={`查看${device.name}的维修服务`}
+              >
+                <Card className="glass-card" hoverable>
+                  <Space direction="vertical" align="center" style={{ width: '100%' }}>
+                    <div style={{ fontSize: 42 }}>{device.icon}</div>
+                    <Title level={4} style={{ margin: 0 }}>
+                      {device.name}
+                    </Title>
+                    <Text type="secondary">常见故障快速预约</Text>
+                  </Space>
+                </Card>
+              </button>
             </Col>
           ))}
         </Row>
@@ -317,7 +370,38 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
 }
 
 function ServicesPage({ deviceTypes, repairItems }: { deviceTypes: DeviceType[]; repairItems: RepairItem[] }) {
-  const [activeType, setActiveType] = useState<number | 'all'>('all');
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const rawDeviceTypeId = searchParams.get('deviceTypeId');
+  const parsedDeviceTypeId = rawDeviceTypeId ? Number(rawDeviceTypeId) : Number.NaN;
+  const hasValidDeviceType = deviceTypes.some((device) => device.id === parsedDeviceTypeId);
+  const activeType: number | 'all' = hasValidDeviceType ? parsedDeviceTypeId : 'all';
+
+  const selectedDevice = useMemo(
+    () => deviceTypes.find((device) => device.id === parsedDeviceTypeId),
+    [deviceTypes, parsedDeviceTypeId]
+  );
+
+  useEffect(() => {
+    if (!rawDeviceTypeId || hasValidDeviceType) {
+      return;
+    }
+
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete('deviceTypeId');
+    setSearchParams(nextSearchParams, { replace: true });
+  }, [hasValidDeviceType, rawDeviceTypeId, searchParams, setSearchParams]);
+
+  const handleActiveTypeChange = (value: number | 'all') => {
+    const nextSearchParams = new URLSearchParams(searchParams);
+    if (value === 'all') {
+      nextSearchParams.delete('deviceTypeId');
+    } else {
+      nextSearchParams.set('deviceTypeId', String(value));
+    }
+    setSearchParams(nextSearchParams);
+  };
 
   const filteredItems = useMemo(
     () => (activeType === 'all' ? repairItems : repairItems.filter((item) => item.deviceTypeId === activeType)),
@@ -333,13 +417,22 @@ function ServicesPage({ deviceTypes, repairItems }: { deviceTypes: DeviceType[];
               服务列表
             </Title>
             <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-              按设备类型浏览常见故障与维修方案，支持后续接入动态价格、库存与评价数据。
+              按设备类型浏览常见故障与维修方案，当前共上架 {repairItems.length} 项高频维修服务，点击“预约”后会自动带入填写页。
             </Paragraph>
+            <Space wrap style={{ marginTop: 12 }}>
+              {selectedDevice ? <Tag color="geekblue">当前设备：{selectedDevice.icon} {selectedDevice.name}</Tag> : null}
+              <Tag color="orange">当前显示 {filteredItems.length} 项服务</Tag>
+              {selectedDevice ? (
+                <Button type="link" style={{ paddingInline: 0 }} onClick={() => handleActiveTypeChange('all')}>
+                  清除设备筛选
+                </Button>
+              ) : null}
+            </Space>
           </div>
           <Select
             value={activeType}
             style={{ minWidth: 220 }}
-            onChange={(value) => setActiveType(value)}
+            onChange={handleActiveTypeChange}
             options={[
               { label: '全部设备', value: 'all' },
               ...deviceTypes.map((device) => ({ label: `${device.icon} ${device.name}`, value: device.id }))
@@ -348,42 +441,48 @@ function ServicesPage({ deviceTypes, repairItems }: { deviceTypes: DeviceType[];
         </Flex>
       </Card>
 
-      <Row gutter={[20, 20]}>
-        {filteredItems.map((item) => (
-          <Col xs={24} md={12} xl={8} key={item.id}>
-            <Card className="glass-card" hoverable>
-              <img className="service-image" src={item.image} alt={item.name} />
-              <Space direction="vertical" size={10} style={{ marginTop: 18, width: '100%' }}>
-                <Flex justify="space-between" align="center">
-                  <Tag color="geekblue">{findDeviceName(deviceTypes, item.deviceTypeId)}</Tag>
-                  <Tag color="orange">销量 {item.sales}</Tag>
-                </Flex>
-                <Title level={4} style={{ margin: 0 }}>
-                  {item.name}
-                </Title>
-                <Paragraph type="secondary" ellipsis={{ rows: 2 }} style={{ minHeight: 44, marginBottom: 0 }}>
-                  {item.description}
-                </Paragraph>
-                <Flex justify="space-between" align="center">
-                  <Space>
-                    <Rate disabled allowHalf defaultValue={item.rating} />
-                    <Text type="secondary">{item.rating}</Text>
-                  </Space>
-                  <Text strong style={{ color: '#ff7a00', fontSize: 18 }}>
-                    {currencyFormatter.format(item.price)}
-                  </Text>
-                </Flex>
-                <Flex justify="space-between" align="center">
-                  <Text type="secondary">预计耗时 {item.duration} 分钟</Text>
-                  <Button type="primary">
-                    <Link to="/booking">预约</Link>
-                  </Button>
-                </Flex>
-              </Space>
-            </Card>
-          </Col>
-        ))}
-      </Row>
+      {filteredItems.length === 0 ? (
+        <Card className="glass-card">
+          <Empty description={selectedDevice ? `${selectedDevice.name} 暂无可展示服务` : '暂无可展示服务'} />
+        </Card>
+      ) : (
+        <Row gutter={[20, 20]}>
+          {filteredItems.map((item) => (
+            <Col xs={24} md={12} xl={8} key={item.id}>
+              <Card className="glass-card" hoverable>
+                <img className="service-image" src={item.image} alt={item.name} />
+                <Space direction="vertical" size={10} style={{ marginTop: 18, width: '100%' }}>
+                  <Flex justify="space-between" align="center">
+                    <Tag color="geekblue">{findDeviceName(deviceTypes, item.deviceTypeId)}</Tag>
+                    <Tag color="orange">销量 {item.sales}</Tag>
+                  </Flex>
+                  <Title level={4} style={{ margin: 0 }}>
+                    {item.name}
+                  </Title>
+                  <Paragraph type="secondary" ellipsis={{ rows: 2 }} style={{ minHeight: 44, marginBottom: 0 }}>
+                    {item.description}
+                  </Paragraph>
+                  <Flex justify="space-between" align="center">
+                    <Space>
+                      <Rate disabled allowHalf defaultValue={item.rating} />
+                      <Text type="secondary">{item.rating}</Text>
+                    </Space>
+                    <Text strong style={{ color: '#ff7a00', fontSize: 18 }}>
+                      {currencyFormatter.format(item.price)}
+                    </Text>
+                  </Flex>
+                  <Flex justify="space-between" align="center">
+                    <Text type="secondary">预计耗时 {item.duration} 分钟</Text>
+                    <Button type="primary" onClick={() => navigate(`/booking?deviceTypeId=${item.deviceTypeId}&repairItemId=${item.id}`)}>
+                      预约
+                    </Button>
+                  </Flex>
+                </Space>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      )}
     </Space>
   );
 }
@@ -532,14 +631,54 @@ function AuthPage({ onAuthSuccess }: { onAuthSuccess: (token: string, user: Auth
 
 function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { currentUser: AuthUser | null; deviceTypes: DeviceType[]; repairItems: RepairItem[]; refreshData: () => Promise<void> }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
-  const selectedDeviceId = Form.useWatch('deviceTypeId', form);
+  const selectedDeviceId = Form.useWatch('deviceTypeId', form) as number | undefined;
+  const selectedRepairItemId = Form.useWatch('repairItemId', form) as number | undefined;
 
   const itemOptions = useMemo(
     () => repairItems.filter((item) => !selectedDeviceId || item.deviceTypeId === selectedDeviceId),
     [repairItems, selectedDeviceId]
   );
+
+  const selectedRepairItem = useMemo(
+    () => repairItems.find((item) => item.id === selectedRepairItemId),
+    [repairItems, selectedRepairItemId]
+  );
+
+  useEffect(() => {
+    const deviceTypeId = Number(searchParams.get('deviceTypeId'));
+    const repairItemId = Number(searchParams.get('repairItemId'));
+    const matchedRepairItem = repairItems.find((item) => item.id === repairItemId);
+
+    if (matchedRepairItem) {
+      form.setFieldsValue({
+        deviceTypeId: matchedRepairItem.deviceTypeId,
+        repairItemId: matchedRepairItem.id
+      });
+      return;
+    }
+
+    if (deviceTypes.some((device) => device.id === deviceTypeId)) {
+      form.setFieldsValue({ deviceTypeId });
+    }
+  }, [deviceTypes, form, repairItems, searchParams]);
+
+  useEffect(() => {
+    const currentRepairItemId = form.getFieldValue('repairItemId') as number | undefined;
+    if (!currentRepairItemId || !selectedDeviceId) {
+      return;
+    }
+
+    const repairItemStillMatches = repairItems.some(
+      (item) => item.id === currentRepairItemId && item.deviceTypeId === selectedDeviceId
+    );
+
+    if (!repairItemStillMatches) {
+      form.setFieldValue('repairItemId', undefined);
+    }
+  }, [form, repairItems, selectedDeviceId]);
 
   if (!currentUser) {
     return <AccessDeniedCard title="请先登录后下单" description="维修预约需要绑定账户，这样订单才知道该归谁，不然平台就像捡到匿名手机一样尴尬。" />;
@@ -549,10 +688,21 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
     return <AccessDeniedCard title="当前身份不能下单" description="工程师账号默认进入接单工作台；如需体验客户端，请注册客户身份。" />;
   }
 
-  const onFinish = async (values: Record<string, string | number>) => {
+  const onFinish = async (values: {
+    deviceTypeId: number;
+    repairItemId: number;
+    deviceModel: string;
+    problemDesc: string;
+    address: string;
+    appointmentTime: Dayjs;
+    paymentMethod: string;
+  }) => {
     setSubmitting(true);
     try {
-      const createOrderResponse = await api.post('/orders', values);
+      const createOrderResponse = await api.post('/orders', {
+        ...values,
+        appointmentTime: values.appointmentTime.format('YYYY-MM-DD HH:mm')
+      });
       const createdOrder = createOrderResponse.data.data as Order;
       await refreshData();
 
@@ -581,7 +731,7 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
       <Col xs={24} lg={16}>
         <Card className="glass-card">
           <Title level={2}>预约下单</Title>
-          <Paragraph type="secondary">客户账号下单后，如果选择微信支付，将跳转到专门的支付页继续完成付款。</Paragraph>
+          <Paragraph type="secondary">客户账号下单后，如果选择微信支付，将跳转到专门的支付页继续完成付款；如果你是从服务列表点进来的，对应服务也会自动带入。预约时间现在也支持日历与时间选择，不用再手打了。</Paragraph>
           <Steps
             current={3}
             style={{ marginBottom: 28 }}
@@ -611,6 +761,25 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
                 </Form.Item>
               </Col>
             </Row>
+            {selectedRepairItem ? (
+              <Card bordered={false} style={{ marginBottom: 20, background: '#fff7e8' }}>
+                <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                  <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
+                    <Title level={4} style={{ margin: 0 }}>
+                      {selectedRepairItem.name}
+                    </Title>
+                    <Tag color="orange">{currencyFormatter.format(selectedRepairItem.price)}</Tag>
+                  </Flex>
+                  <Text type="secondary">{selectedRepairItem.description}</Text>
+                  <Space wrap>
+                    <Tag color="geekblue">{findDeviceName(deviceTypes, selectedRepairItem.deviceTypeId)}</Tag>
+                    <Tag color="green">预计 {selectedRepairItem.duration} 分钟</Tag>
+                    <Tag color="purple">评分 {selectedRepairItem.rating}</Tag>
+                    <Tag color="cyan">销量 {selectedRepairItem.sales}</Tag>
+                  </Space>
+                </Space>
+              </Card>
+            ) : null}
             <Row gutter={16}>
               <Col xs={24} md={12}>
                 <Form.Item name="deviceModel" label="设备型号" rules={[{ required: true, message: '请输入设备型号' }]}>
@@ -619,7 +788,18 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
               </Col>
               <Col xs={24} md={12}>
                 <Form.Item name="appointmentTime" label="预约时间" rules={[{ required: true, message: '请输入预约时间' }]}>
-                  <Input prefix={<CalendarOutlined />} placeholder="例如：2026-03-12 14:00-16:00" />
+                  <DatePicker
+                    style={{ width: '100%' }}
+                    format="YYYY-MM-DD HH:mm"
+                    placeholder="请选择上门日期与时间"
+                    showTime={{
+                      format: 'HH:mm',
+                      minuteStep: 30,
+                      hideDisabledOptions: true,
+                      disabledTime: getDisabledAppointmentTime
+                    }}
+                    disabledDate={disablePastAppointmentDates}
+                  />
                 </Form.Item>
               </Col>
             </Row>
@@ -645,7 +825,7 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
                 <Card bordered={false} style={{ background: '#fff7e8', marginTop: 30 }}>
                   <Space align="start">
                     <CreditCardOutlined style={{ color: '#ff7a00', fontSize: 20, marginTop: 6 }} />
-                    <Text type="secondary">微信支付订单将进入专属支付页，可继续支付、轮询状态，并在 mock 模式下直接模拟扫码成功。</Text>
+                    <Text type="secondary">微信支付订单将进入专属支付页，展示你的微信收款码；用户扫码后可点击“我已完成支付”通知平台。</Text>
                   </Space>
                 </Card>
               </Col>
@@ -681,8 +861,9 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
   const [preparing, setPreparing] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
   const [readiness, setReadiness] = useState<PaymentReadiness | null>(null);
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>('mock');
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('manual');
   const [codeUrl, setCodeUrl] = useState<string>();
+  const [customQrImageUnavailable, setCustomQrImageUnavailable] = useState(false);
 
   const fetchPaymentData = async () => {
     if (!orderId) {
@@ -734,7 +915,7 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
     }
   };
 
-  const confirmMockPayment = async () => {
+  const confirmManualPayment = async () => {
     if (!orderId) {
       return;
     }
@@ -743,18 +924,22 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
     try {
       const response = await api.post(`/payments/wechat/confirm/${orderId}`);
       setOrder(response.data.data as Order);
-      message.success('模拟支付成功，订单已进入待分配状态。');
+      message.success('支付已确认，订单已进入待分配状态。');
       await refreshData();
     } catch (error: unknown) {
       const errorMessage =
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || '模拟支付失败');
+      message.error(errorMessage || '确认支付失败');
     } finally {
       setPreparing(false);
     }
   };
+
+  useEffect(() => {
+    setCustomQrImageUnavailable(false);
+  }, [orderId]);
 
   useEffect(() => {
     void fetchPaymentData();
@@ -818,6 +1003,7 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
   }
 
   const isPaid = order.paymentStatus === '已支付';
+  const shouldShowManualWechatQr = paymentMode === 'manual' && !customQrImageUnavailable;
 
   return (
     <Row gutter={[24, 24]}>
@@ -854,7 +1040,7 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
                 <Descriptions.Item label="预约时间">{order.appointmentTime}</Descriptions.Item>
                 <Descriptions.Item label="支付方式">{order.paymentMethod}</Descriptions.Item>
                 <Descriptions.Item label="支付模式">
-                  <Tag color={paymentMode === 'live' ? 'green' : 'gold'}>{paymentMode === 'live' ? '真实微信支付' : 'Mock 调试支付'}</Tag>
+                  <Tag color={paymentMode === 'live' ? 'green' : 'gold'}>{paymentMode === 'live' ? '微信商户直连支付' : '微信收款码支付'}</Tag>
                 </Descriptions.Item>
               </Descriptions>
 
@@ -862,20 +1048,42 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
                 <Alert
                   type={paymentMode === 'live' ? 'success' : 'info'}
                   showIcon
-                  message={paymentMode === 'live' ? '已连接微信支付商户配置' : '当前处于 Mock 支付模式'}
+                  message={paymentMode === 'live' ? '已连接微信支付商户配置' : '当前使用微信收款码支付'}
                   description={readiness.message}
                 />
               ) : null}
 
+              {paymentMode === 'manual' && customQrImageUnavailable ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  message="未检测到本地微信收款码图片"
+                  description="请将你的微信收款码图片放到 client/public/images/payments/wechat-pay-qr.png，支付页就会使用这张图片作为微信支付方式展示。"
+                />
+              ) : null}
+
               <Flex vertical align="center" gap={16}>
-                {codeUrl ? <QRCode value={codeUrl} size={220} /> : <Alert type="info" showIcon message="尚未生成支付二维码" />}
+                {shouldShowManualWechatQr ? (
+                  <img
+                    className="payment-qr-image"
+                    src={manualWechatPayQrImage}
+                    alt="微信支付收款二维码"
+                    onError={() => setCustomQrImageUnavailable(true)}
+                  />
+                ) : paymentMode === 'live' && codeUrl ? (
+                  <QRCode value={codeUrl} size={220} />
+                ) : (
+                  <Alert type="info" showIcon message={paymentMode === 'live' ? '尚未生成支付二维码' : '请先放入微信收款码图片'} />
+                )}
                 <Space wrap>
-                  <Button type="primary" icon={<QrcodeOutlined />} loading={preparing} onClick={() => void preparePayment()}>
-                    {codeUrl ? '重新获取二维码' : '生成支付二维码'}
-                  </Button>
-                  {paymentMode === 'mock' ? (
-                    <Button loading={preparing} onClick={() => void confirmMockPayment()}>
-                      模拟微信扫码完成支付
+                  {paymentMode === 'live' ? (
+                    <Button type="primary" icon={<QrcodeOutlined />} loading={preparing} onClick={() => void preparePayment()}>
+                      {codeUrl ? '重新获取二维码' : '生成支付二维码'}
+                    </Button>
+                  ) : null}
+                  {paymentMode === 'manual' ? (
+                    <Button type="primary" loading={preparing} onClick={() => void confirmManualPayment()}>
+                      我已完成支付
                     </Button>
                   ) : null}
                   <Button onClick={() => void fetchPaymentData()}>刷新支付状态</Button>
@@ -883,7 +1091,9 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
                 <Text type="secondary">
                   {paymentMode === 'live'
                     ? '请使用微信扫一扫完成支付，支付成功后页面会自动更新。'
-                    : '当前未配置真实商户信息，因此使用 mock 流程模拟扫码支付。'}
+                    : shouldShowManualWechatQr
+                      ? '当前展示的是你放在 public 目录下的微信收款码图片；用户完成扫码支付后，请点击“我已完成支付”通知平台。'
+                      : '请先将微信收款码图片放到 public 目录，之后用户即可通过该二维码进行微信支付。'}
                 </Text>
               </Flex>
             </Space>
@@ -896,8 +1106,8 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
           <Timeline
             items={[
               { children: '订单创建后进入待支付状态' },
-              { children: '客户进入支付页获取二维码' },
-              { children: '微信扫码支付或 mock 模拟支付' },
+              { children: '客户进入支付页查看微信收款码' },
+              { children: '微信扫码支付并点击“我已完成支付”' },
               { children: '支付成功后订单进入待分配状态' }
             ]}
           />
@@ -908,6 +1118,8 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
 }
 
 function UserCenterPage({ currentUser, orders, repairItems, refreshData }: { currentUser: AuthUser | null; orders: Order[]; repairItems: RepairItem[]; refreshData: () => Promise<void> }) {
+  const navigate = useNavigate();
+
   if (!currentUser) {
     return <AccessDeniedCard title="请先登录后查看订单" description="个人中心只展示当前登录客户自己的订单。" />;
   }
@@ -978,8 +1190,8 @@ function UserCenterPage({ currentUser, orders, repairItems, refreshData }: { cur
               </Descriptions>
               <Space wrap style={{ marginTop: 16 }}>
                 {order.paymentMethod === '微信支付' && order.paymentStatus !== '已支付' ? (
-                  <Button type="primary">
-                    <Link to={`/payment/${order.id}`}>继续支付</Link>
+                  <Button type="primary" onClick={() => navigate(`/payment/${order.id}`)}>
+                    继续支付
                   </Button>
                 ) : null}
                 {order.status !== '已取消' && order.status !== '已完成' ? (

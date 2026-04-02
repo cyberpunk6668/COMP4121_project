@@ -139,7 +139,9 @@ export const deviceTypes: DeviceType[] = [
   { id: 1, name: '手机', icon: '📱', status: 1 },
   { id: 2, name: '电脑', icon: '💻', status: 1 },
   { id: 3, name: '平板', icon: '🧾', status: 1 },
-  { id: 4, name: '相机', icon: '📷', status: 1 }
+  { id: 4, name: '相机', icon: '📷', status: 1 },
+  { id: 5, name: '智能手表', icon: '⌚', status: 1 },
+  { id: 6, name: '游戏机', icon: '🎮', status: 1 }
 ];
 
 export const repairItems: RepairItem[] = [
@@ -186,6 +188,138 @@ export const repairItems: RepairItem[] = [
     image: 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?auto=format&fit=crop&w=900&q=80',
     rating: 4.7,
     sales: 530
+  },
+  {
+    id: 5,
+    deviceTypeId: 1,
+    name: '手机进水检测与除潮',
+    description: '适用于进水、受潮、扬声器异常、不开机等应急维修场景。',
+    price: 239,
+    duration: 80,
+    image: 'https://images.unsplash.com/photo-1512499617640-c74ae3a79d37?auto=format&fit=crop&w=900&q=80',
+    rating: 4.8,
+    sales: 610
+  },
+  {
+    id: 6,
+    deviceTypeId: 1,
+    name: '手机后盖 / 中框修复',
+    description: '处理后盖碎裂、边框磕碰变形、摄像头外圈损伤等问题。',
+    price: 169,
+    duration: 50,
+    image: 'https://images.unsplash.com/photo-1574944985070-8f3ebc6b79d2?auto=format&fit=crop&w=900&q=80',
+    rating: 4.7,
+    sales: 420
+  },
+  {
+    id: 7,
+    deviceTypeId: 2,
+    name: '笔记本系统重装与优化',
+    description: '系统重装、驱动补齐、常用软件安装与开机加速一站完成。',
+    price: 149,
+    duration: 70,
+    image: 'https://images.unsplash.com/photo-1496171367470-9ed9a91ea931?auto=format&fit=crop&w=900&q=80',
+    rating: 4.7,
+    sales: 690
+  },
+  {
+    id: 8,
+    deviceTypeId: 2,
+    name: '笔记本键盘 / 触控板维修',
+    description: '适用于按键失灵、连击、触控漂移、排线松动等故障。',
+    price: 269,
+    duration: 95,
+    image: 'https://images.unsplash.com/photo-1517336714739-489689fd1ca8?auto=format&fit=crop&w=900&q=80',
+    rating: 4.8,
+    sales: 360
+  },
+  {
+    id: 9,
+    deviceTypeId: 3,
+    name: '平板屏幕更换',
+    description: '解决平板碎屏、显示异常、触摸失效等常见问题。',
+    price: 329,
+    duration: 100,
+    image: 'https://images.unsplash.com/photo-1561154464-82e9adf32764?auto=format&fit=crop&w=900&q=80',
+    rating: 4.8,
+    sales: 450
+  },
+  {
+    id: 10,
+    deviceTypeId: 3,
+    name: '平板充电口维修',
+    description: '针对充电接触不良、无法充电、尾插松动等故障快速处理。',
+    price: 189,
+    duration: 55,
+    image: 'https://images.unsplash.com/photo-1542751110-97427bbecf20?auto=format&fit=crop&w=900&q=80',
+    rating: 4.6,
+    sales: 310
+  },
+  {
+    id: 11,
+    deviceTypeId: 4,
+    name: '相机镜头 / 快门检测',
+    description: '适用于镜头报错、快门卡滞、无法对焦等精密故障检测。',
+    price: 359,
+    duration: 120,
+    image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=900&q=80',
+    rating: 4.9,
+    sales: 180
+  },
+  {
+    id: 12,
+    deviceTypeId: 4,
+    name: '相机传感器清洁保养',
+    description: '清理灰尘污渍，减少照片黑点，适合日常保养与换季维护。',
+    price: 219,
+    duration: 45,
+    image: 'https://images.unsplash.com/photo-1502920917128-1aa500764cbd?auto=format&fit=crop&w=900&q=80',
+    rating: 4.8,
+    sales: 260
+  },
+  {
+    id: 13,
+    deviceTypeId: 5,
+    name: '智能手表屏幕更换',
+    description: '适用于表盘碎裂、触控异常、显示偏色等维修需求。',
+    price: 279,
+    duration: 80,
+    image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80',
+    rating: 4.7,
+    sales: 240
+  },
+  {
+    id: 14,
+    deviceTypeId: 5,
+    name: '智能手表电池更换',
+    description: '改善手表待机时间短、充不满电、运动中自动关机等问题。',
+    price: 189,
+    duration: 50,
+    image: 'https://images.unsplash.com/photo-1434494878577-86c23bcb06b9?auto=format&fit=crop&w=900&q=80',
+    rating: 4.6,
+    sales: 195
+  },
+  {
+    id: 15,
+    deviceTypeId: 6,
+    name: '游戏机散热清洁与性能优化',
+    description: '清理积灰、改善高温降频、降低风扇噪音并检查运行状态。',
+    price: 229,
+    duration: 75,
+    image: 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?auto=format&fit=crop&w=900&q=80',
+    rating: 4.8,
+    sales: 280
+  },
+  {
+    id: 16,
+    deviceTypeId: 6,
+    name: '游戏机 HDMI / 接口维修',
+    description: '针对无信号、接口松动、无法连接电视等问题进行快速检修。',
+    price: 299,
+    duration: 90,
+    image: 'https://images.unsplash.com/photo-1593305841991-05c297ba4575?auto=format&fit=crop&w=900&q=80',
+    rating: 4.7,
+    sales: 210
   }
 ];
 
