@@ -110,7 +110,7 @@ export default function InteractiveMapPreview({
           return;
         }
         setResult(null);
-        setError(fetchError instanceof Error ? fetchError.message : tx('地图解析失败', 'Failed to resolve the map location'));
+        setError(tx('地图解析失败，请稍后重试。', 'Failed to resolve the map location. Please try again later.'));
       })
       .finally(() => {
         if (!controller.signal.aborted) {

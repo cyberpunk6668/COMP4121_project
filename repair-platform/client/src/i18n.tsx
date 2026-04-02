@@ -124,6 +124,10 @@ const englishDictionary: Record<string, string> = {
   '智能手表电池更换': 'Smartwatch battery replacement',
   '游戏机散热清洁与性能优化': 'Console cooling cleanup and optimisation',
   '游戏机 HDMI / 接口维修': 'Console HDMI / port repair',
+  '适用于碎屏、花屏、触控失灵等常见问题。': 'Suitable for cracked screens, display distortion, and touch failure.',
+  '解决续航差、自动关机、充电异常等问题。': 'Fixes poor battery life, random shutdowns, and charging issues.',
+  '降低温度与风扇噪音，提升性能稳定性。': 'Lowers temperature and fan noise while improving performance stability.',
+  '适用于电池鼓包、掉电快、充电慢等故障。': 'Suitable for swollen batteries, fast power drain, and slow charging problems.',
   '适用于常见碎屏、触摸失灵、显示异常等场景。': 'Ideal for cracked glass, touch failure, and display issues.',
   '解决续航变差、自动关机、充电发热等高频问题。': 'Fixes poor battery life, random shutdowns, and charging heat issues.',
   '深度清理散热模组，改善卡顿与过热问题。': 'Deep cleans the cooling system to reduce lag and overheating.',
@@ -142,10 +146,18 @@ const englishDictionary: Record<string, string> = {
   '针对无信号、接口松动、无法连接电视等问题进行快速检修。': 'Repairs no-signal issues, loose ports, and TV connection failures.',
   '张工': 'Engineer Zhang',
   '刘工': 'Engineer Liu',
+  '手机主板、屏幕、电池、进水维修': 'Specialised in phone logic board, screen, battery, and liquid-damage repair',
   '手机主板、屏幕与电池维修专家': 'Specialist in phone logic boards, screens, and batteries',
+  '演示客户': 'Demo Customer',
+  '工程师账号': 'Engineer Account',
   '电脑清灰、风扇与系统故障维修': 'Focused on computer cleaning, fan issues, and system repairs',
   '悉尼 CBD / Zetland': 'Sydney CBD / Zetland',
   '请先登录后支付': 'Please sign in before paying',
+  'Chatswood / 北悉尼': 'Chatswood / North Sydney',
+  '当前未完成微信商户直连配置，已切换为微信收款码支付。用户扫码完成后，请在页面点击“我已完成支付”。': 'Direct WeChat merchant payment is not fully configured yet, so the system has switched to static WeChat QR payment. After the user scans and pays, please click “I have completed payment”.',
+  '当前使用微信收款码支付。用户扫码完成后，请在页面点击“我已完成支付”。': 'The system is currently using static WeChat QR payment. After the user scans and pays, please click “I have completed payment”.',
+  '需要管理员权限': 'Administrator access required',
+  '管理后台只对管理员账号开放。': 'The admin panel is only available to administrator accounts.',
   '订单不存在': 'Order not found',
   '该订单不需要微信支付': 'This order does not require WeChat Pay',
   '查看我的订单': 'View my orders',
@@ -161,8 +173,34 @@ const englishDictionary: Record<string, string> = {
   '累计订单': 'Total orders',
   '当前设备：': 'Current device: ',
   '微信商户直连支付': 'Direct WeChat merchant payment',
-  '微信收款码支付': 'Static WeChat QR payment'
+  '微信收款码支付': 'Static WeChat QR payment',
+  '需要先登录。': 'You need to sign in first.',
+  '需要提供手机号、密码、昵称和身份。': 'Phone, password, nickname, and role are required.',
+  '身份必须是客户或工程师。': 'Role must be customer or engineer.',
+  '密码至少需要 6 位。': 'Password must be at least 6 characters long.',
+  '该手机号已注册。': 'This phone number has already been registered.',
+  '需要提供手机号和密码。': 'Phone and password are required.',
+  '手机号或密码不正确。': 'Phone or password is incorrect.',
+  '当前用户会话无效。': 'User session is invalid.',
+  '当前操作无权限。': 'You do not have permission for this action.',
+  '登录令牌无效或已过期。': 'Invalid or expired token.',
+  '未找到维修项目。': 'Repair item not found.',
+  '缺少必填字段。': 'Missing required fields.',
+  '你无法查看该订单。': 'You cannot access this order.',
+  '你无法取消该订单。': 'You cannot cancel this order.',
+  '你无法评价该订单。': 'You cannot review this order.',
+  '该订单不是微信支付方式。': 'This order is not using WeChat Pay.',
+  '你无法支付该订单。': 'You cannot pay this order.',
+  '静态微信收款码渠道下才支持手动确认。': 'Manual confirmation is only available when using the static WeChat QR payment channel.',
+  '创建微信支付失败。': 'Failed to create WeChat payment.',
+  '查询微信支付状态失败。': 'Failed to query WeChat payment status.',
+  '工程师资料不可用。': 'Engineer profile is not available.',
+  '只能开始自己被分配的订单。': 'You can only start your own assigned orders.',
+  '只能完成自己被分配的订单。': 'You can only complete your own assigned orders.',
+  '未找到工程师。': 'Engineer not found.'
 };
+
+const chineseDictionary = Object.fromEntries(Object.entries(englishDictionary).map(([zh, en]) => [en, zh]));
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
@@ -191,7 +229,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       if (!text) {
         return '';
       }
-      return language === 'en' ? englishDictionary[text] ?? text : text;
+      return language === 'en' ? englishDictionary[text] ?? text : chineseDictionary[text] ?? text;
     },
     tx: (zh: string, en: string) => (language === 'en' ? en : zh),
     antdLocale: language === 'en' ? enUS : zhCN

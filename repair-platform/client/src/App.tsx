@@ -206,6 +206,7 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
   const navigate = useNavigate();
   const { t, tx } = useLanguage();
   const topServices = useMemo(() => repairItems.slice(0, 3), [repairItems]);
+  const displayNickname = currentUser ? t(currentUser.nickname) : '';
 
   return (
     <Space direction="vertical" size={28} style={{ width: '100%' }}>
@@ -225,7 +226,7 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
               <Alert
                 type="success"
                 showIcon
-                message={tx(`欢迎回来，${currentUser.nickname}`, `Welcome back, ${currentUser.nickname}`)}
+                message={tx(`欢迎回来，${displayNickname}`, `Welcome back, ${displayNickname}`)}
                 description={tx(`当前身份：${getRoleLabel(currentUser.role)}。系统会根据你的注册身份自动展示对应工作台。`, `Current role: ${t(getRoleLabel(currentUser.role))}. The platform automatically opens the workspace that matches your account type.`)}
                 style={{ marginBottom: 18 }}
               />
@@ -525,7 +526,7 @@ function AuthPage({ onAuthSuccess }: { onAuthSuccess: (token: string, user: Auth
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || tx('登录失败', 'Sign-in failed'));
+      message.error((errorMessage && t(errorMessage)) || tx('登录失败', 'Sign-in failed'));
     } finally {
       setLoading(false);
     }
@@ -544,7 +545,7 @@ function AuthPage({ onAuthSuccess }: { onAuthSuccess: (token: string, user: Auth
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || tx('注册失败', 'Registration failed'));
+      message.error((errorMessage && t(errorMessage)) || tx('注册失败', 'Registration failed'));
     } finally {
       setLoading(false);
     }
@@ -747,7 +748,7 @@ function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { c
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || tx('创建订单失败，请确认后端服务已启动。', 'Failed to create the order. Please make sure the backend server is running.'));
+      message.error((errorMessage && t(errorMessage)) || tx('创建订单失败，请确认后端服务已启动。', 'Failed to create the order. Please make sure the backend server is running.'));
     } finally {
       setSubmitting(false);
     }
@@ -959,7 +960,7 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || tx('加载支付信息失败', 'Failed to load payment details'));
+      message.error((errorMessage && t(errorMessage)) || tx('加载支付信息失败', 'Failed to load payment details'));
     } finally {
       setLoading(false);
     }
@@ -982,7 +983,7 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || tx('生成支付二维码失败', 'Failed to generate the payment QR code'));
+      message.error((errorMessage && t(errorMessage)) || tx('生成支付二维码失败', 'Failed to generate the payment QR code'));
     } finally {
       setPreparing(false);
     }
@@ -1004,7 +1005,7 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || tx('确认支付失败', 'Failed to confirm payment'));
+      message.error((errorMessage && t(errorMessage)) || tx('确认支付失败', 'Failed to confirm payment'));
     } finally {
       setPreparing(false);
     }
@@ -1122,7 +1123,7 @@ function PaymentPage({ currentUser, refreshData }: { currentUser: AuthUser | nul
                   type={paymentMode === 'live' ? 'success' : 'info'}
                   showIcon
                   message={paymentMode === 'live' ? tx('已连接微信支付商户配置', 'WeChat merchant configuration detected') : tx('当前使用微信收款码支付', 'Using static WeChat QR payment')}
-                  description={readiness.message}
+                  description={t(readiness.message)}
                 />
               ) : null}
 
@@ -1212,7 +1213,7 @@ function UserCenterPage({ currentUser, orders, repairItems, refreshData }: { cur
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || tx('取消订单失败', 'Failed to cancel the order'));
+      message.error((errorMessage && t(errorMessage)) || tx('取消订单失败', 'Failed to cancel the order'));
     }
   };
 
@@ -1282,6 +1283,7 @@ function UserCenterPage({ currentUser, orders, repairItems, refreshData }: { cur
 
 function EngineerPage({ currentUser, orders, refreshOrders, deviceTypes, repairItems }: { currentUser: AuthUser | null; orders: Order[]; refreshOrders: () => Promise<void>; deviceTypes: DeviceType[]; repairItems: RepairItem[] }) {
   const { t, tx } = useLanguage();
+
   if (!currentUser) {
     return <AccessDeniedCard title={tx('请先登录工程师账号', 'Please sign in with an engineer account')} description={tx('工程师端需要登录后才能查看待接单和我的服务单。', 'The engineer console requires sign-in before you can view open jobs and assigned service orders.')} />;
   }
@@ -1291,6 +1293,7 @@ function EngineerPage({ currentUser, orders, refreshOrders, deviceTypes, repairI
   }
 
   const activeEngineer = currentUser.engineerProfile ?? fallbackEngineers[0];
+  const activeEngineerName = t(activeEngineer.realName);
   const availableOrders = orders.filter((order) => order.status === '待分配');
   const myOrders = orders.filter((order) => order.engineerId === activeEngineer.id);
   const activeOrders = myOrders.filter((order) => ['待上门', '服务中'].includes(order.status));
@@ -1310,7 +1313,7 @@ function EngineerPage({ currentUser, orders, refreshOrders, deviceTypes, repairI
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || tx('工程师操作失败', 'Engineer action failed'));
+      message.error((errorMessage && t(errorMessage)) || tx('工程师操作失败', 'Engineer action failed'));
     }
   };
 
@@ -1341,7 +1344,7 @@ function EngineerPage({ currentUser, orders, refreshOrders, deviceTypes, repairI
               <Descriptions.Item label={tx('设备类型', 'Device type')}>{t(deviceTypeName)}</Descriptions.Item>
               <Descriptions.Item label={tx('设备型号', 'Device model')}>{order.deviceModel}</Descriptions.Item>
               <Descriptions.Item label={tx('预约时间', 'Appointment time')}>{order.appointmentTime}</Descriptions.Item>
-              <Descriptions.Item label={tx('客户昵称', 'Customer name')}>{order.customerNickname ?? t('平台用户')}</Descriptions.Item>
+              <Descriptions.Item label={tx('客户昵称', 'Customer name')}>{order.customerNickname ? t(order.customerNickname) : t('平台用户')}</Descriptions.Item>
               <Descriptions.Item label={tx('联系电话', 'Phone number')}>{order.customerPhone ?? t('平台统一协调')}</Descriptions.Item>
               <Descriptions.Item label={tx('订单金额', 'Order amount')}>{currencyFormatter.format(order.totalAmount)}</Descriptions.Item>
               <Descriptions.Item label={tx('支付状态', 'Payment status')}>{t(order.paymentStatus)}</Descriptions.Item>
@@ -1396,7 +1399,7 @@ function EngineerPage({ currentUser, orders, refreshOrders, deviceTypes, repairI
             <Flex gap={16} align="center">
               <Avatar size={72} src={activeEngineer.avatar} icon={<UserOutlined />} />
               <div>
-                <Title level={3} style={{ marginBottom: 4 }}>{tx(`${activeEngineer.realName} 的工作台`, `${activeEngineer.realName}’s workbench`)}</Title>
+                <Title level={3} style={{ marginBottom: 4 }}>{tx(`${activeEngineerName} 的工作台`, `${activeEngineerName}'s workbench`)}</Title>
                 <Text type="secondary">{t(activeEngineer.skillDesc)}</Text>
                 <div style={{ marginTop: 6 }}>
                   <Text type="secondary">{tx('本页只保留工程师最关心的订单信息：客户需求、地址、时间、支付状态与处理动作。', 'This page keeps only the information engineers care about most: customer needs, address, time, payment status, and action buttons.')}</Text>
@@ -1463,7 +1466,7 @@ function AdminPage({ currentUser, orders, engineers, repairItems, deviceTypes, r
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      message.error(errorMessage || tx('指派失败', 'Failed to assign engineer'));
+      message.error((errorMessage && t(errorMessage)) || tx('指派失败', 'Failed to assign engineer'));
     }
   };
 
@@ -1493,7 +1496,10 @@ function AdminPage({ currentUser, orders, engineers, repairItems, deviceTypes, r
             { title: tx('订单状态', 'Order status'), render: (_, order: Order) => <Tag color={statusColors[order.status]}>{t(order.status)}</Tag> },
             {
               title: tx('工程师', 'Engineer'),
-              render: (_, order: Order) => engineers.find((engineer) => engineer.id === order.engineerId)?.realName ?? t('未分配')
+              render: (_, order: Order) => {
+                const engineerName = engineers.find((engineer) => engineer.id === order.engineerId)?.realName;
+                return engineerName ? t(engineerName) : t('未分配');
+              }
             },
             {
               title: tx('指派', 'Assign'),
@@ -1502,7 +1508,7 @@ function AdminPage({ currentUser, orders, engineers, repairItems, deviceTypes, r
                   placeholder={tx('选择工程师', 'Choose an engineer')}
                   style={{ minWidth: 140 }}
                   onChange={(value) => void assignEngineer(order.id, value)}
-                  options={engineers.map((engineer) => ({ label: engineer.realName, value: engineer.id }))}
+                  options={engineers.map((engineer) => ({ label: t(engineer.realName), value: engineer.id }))}
                 />
               )
             }
@@ -1661,7 +1667,7 @@ function AppContent() {
               {currentUser ? (
                 <Space>
                   <Tag color="blue">{t(getRoleLabel(currentUser.role))}</Tag>
-                  <Text>{currentUser.nickname}</Text>
+                  <Text>{t(currentUser.nickname)}</Text>
                   <Button icon={<LogoutOutlined />} onClick={logout}>{tx('退出', 'Sign out')}</Button>
                 </Space>
               ) : null}
