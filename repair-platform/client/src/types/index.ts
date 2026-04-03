@@ -52,6 +52,7 @@ export type OrderStatus =
 
 export type PaymentStatus = '待支付' | '已支付' | '支付失败';
 export type PaymentMode = 'live' | 'manual';
+export type FeedbackScope = 'order' | 'platform';
 
 export interface Order {
   id: number;
@@ -77,6 +78,34 @@ export interface Order {
   engineerName?: string;
   repairItemName?: string;
   deviceTypeName?: string;
+}
+
+export interface FeedbackReply {
+  id: number;
+  threadId: number;
+  authorUserId: number;
+  authorRole: UserRole;
+  authorName?: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface FeedbackThread {
+  id: number;
+  scope: FeedbackScope;
+  orderId: number | null;
+  orderNo?: string;
+  authorUserId: number;
+  authorRole: UserRole;
+  authorName?: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  repairItemName?: string;
+  customerNickname?: string;
+  engineerName?: string;
+  replies: FeedbackReply[];
 }
 
 export interface PaymentReadiness {

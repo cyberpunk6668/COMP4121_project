@@ -197,7 +197,14 @@ const englishDictionary: Record<string, string> = {
   '工程师资料不可用。': 'Engineer profile is not available.',
   '只能开始自己被分配的订单。': 'You can only start your own assigned orders.',
   '只能完成自己被分配的订单。': 'You can only complete your own assigned orders.',
-  '未找到工程师。': 'Engineer not found.'
+  '未找到工程师。': 'Engineer not found.',
+  '反馈标题和内容不能为空。': 'Feedback title and content are required.',
+  '反馈类型必须是订单或平台。': 'Feedback scope must be order or platform.',
+  '订单反馈必须关联订单。': 'Order feedback must be linked to an order.',
+  '你无法为该订单创建反馈。': 'You cannot create feedback for this order.',
+  '未找到反馈主题。': 'Feedback thread not found.',
+  '你没有权限查看该反馈主题。': 'You do not have permission to view this feedback thread.',
+  '回复内容不能为空。': 'Reply content is required.'
 };
 
 const chineseDictionary = Object.fromEntries(Object.entries(englishDictionary).map(([zh, en]) => [en, zh]));

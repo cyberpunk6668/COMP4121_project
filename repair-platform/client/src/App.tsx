@@ -33,6 +33,7 @@ import {
 } from 'antd';
 import {
   CalendarOutlined,
+  MessageOutlined,
   CreditCardOutlined,
   DashboardOutlined,
   LaptopOutlined,
@@ -59,9 +60,10 @@ import {
   serviceSteps,
   testimonials
 } from './data/mock';
+import FeedbackForumPage from './components/FeedbackForumPage';
 import InteractiveMapPreview from './components/InteractiveMapPreview';
 import AnimatedCharactersLoginPage from './components/ui/animated-characters-login-page';
-import type { AuthUser, DeviceType, Engineer, Order, PaymentMode, PaymentReadiness, RepairItem, UserRole } from './types';
+import type { AuthUser, DeviceType, Engineer, FeedbackThread, Order, PaymentMode, PaymentReadiness, RepairItem, UserRole } from './types';
 
 const { Header, Content, Footer } = Layout;
 const { Title, Paragraph, Text } = Typography;
@@ -1126,6 +1128,7 @@ function UserCenterPage({ currentUser, orders, repairItems, refreshData }: { cur
                 <Descriptions.Item label={tx('问题描述', 'Issue description')} span={4}>{order.problemDesc}</Descriptions.Item>
               </Descriptions>
               <Space wrap style={{ marginTop: 16 }}>
+                <Button onClick={() => navigate(`/forum?orderId=${order.id}`)}>{tx('订单讨论', 'Order discussion')}</Button>
                 {order.paymentMethod === '微信支付' && order.paymentStatus !== '已支付' ? (
                   <Button type="primary" onClick={() => navigate(`/payment/${order.id}`)}>
                     {tx('继续支付', 'Continue payment')}
@@ -1144,6 +1147,7 @@ function UserCenterPage({ currentUser, orders, repairItems, refreshData }: { cur
 }
 
 function EngineerPage({ currentUser, orders, refreshOrders, deviceTypes, repairItems }: { currentUser: AuthUser | null; orders: Order[]; refreshOrders: () => Promise<void>; deviceTypes: DeviceType[]; repairItems: RepairItem[] }) {
+  const navigate = useNavigate();
   const { t, tx } = useLanguage();
 
   if (!currentUser) {
@@ -1234,6 +1238,7 @@ function EngineerPage({ currentUser, orders, refreshOrders, deviceTypes, repairI
         </Row>
 
         <Space wrap style={{ marginTop: 18 }}>
+          <Button onClick={() => navigate(`/forum?orderId=${order.id}`)}>{tx('订单讨论', 'Order discussion')}</Button>
           {order.status === '待分配' ? <Button type="primary" onClick={() => void updateOrder(order.id, 'accept')}>{tx('抢单', 'Accept order')}</Button> : null}
           {order.status === '待上门' ? <Button onClick={() => void updateOrder(order.id, 'start')}>{tx('开始服务', 'Start service')}</Button> : null}
           {order.status === '服务中' ? <Button type="primary" onClick={() => void updateOrder(order.id, 'complete')}>{tx('完成服务', 'Complete service')}</Button> : null}
@@ -1391,6 +1396,7 @@ function AppContent() {
   const [deviceTypes, setDeviceTypes] = useState<DeviceType[]>(fallbackDeviceTypes);
   const [repairItems, setRepairItems] = useState<RepairItem[]>(fallbackRepairItems);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [feedbackThreads, setFeedbackThreads] = useState<FeedbackThread[]>([]);
   const [engineers, setEngineers] = useState<Engineer[]>(fallbackEngineers);
 
   const persistSession = async (token: string, user: AuthUser) => {
@@ -1404,6 +1410,7 @@ function AppContent() {
     window.localStorage.removeItem('repair-user');
     setCurrentUser(null);
     setOrders([]);
+    setFeedbackThreads([]);
   };
 
   const refreshData = async () => {
@@ -1416,10 +1423,12 @@ function AppContent() {
       setEngineers(engineerRes.data.data);
 
       if (currentUser) {
-        const ordersResponse = await api.get('/orders');
+        const [ordersResponse, feedbackResponse] = await Promise.all([api.get('/orders'), api.get('/feedback')]);
         setOrders(ordersResponse.data.data);
+        setFeedbackThreads(feedbackResponse.data.data);
       } else {
         setOrders([]);
+        setFeedbackThreads([]);
       }
     } catch (error) {
       if (!currentUser) {
@@ -1472,7 +1481,10 @@ function AppContent() {
   const isEngineerOnly = currentUser?.role === 'engineer';
 
   const navigationItems = isEngineerOnly
-    ? [{ key: '/engineer', icon: <ToolOutlined />, label: <Link to="/engineer">{tx('订单工作台', 'Order workbench')}</Link> }]
+    ? [
+        { key: '/engineer', icon: <ToolOutlined />, label: <Link to="/engineer">{tx('订单工作台', 'Order workbench')}</Link> },
+        { key: '/forum', icon: <MessageOutlined />, label: <Link to="/forum">{tx('反馈论坛', 'Feedback forum')}</Link> }
+      ]
     : [
         { key: '/', icon: <DashboardOutlined />, label: <Link to="/">{tx('首页', 'Home')}</Link> },
         { key: '/services', icon: <LaptopOutlined />, label: <Link to="/services">{tx('服务列表', 'Services')}</Link> },
@@ -1485,6 +1497,7 @@ function AppContent() {
         ...(currentUser && (currentUser.role === 'engineer' || currentUser.role === 'admin')
           ? [{ key: '/engineer', icon: <ToolOutlined />, label: <Link to="/engineer">{tx('工程师端', 'Engineer console')}</Link> }]
           : []),
+        ...(currentUser ? [{ key: '/forum', icon: <MessageOutlined />, label: <Link to="/forum">{tx('反馈论坛', 'Feedback forum')}</Link> }] : []),
         ...(currentUser?.role === 'admin'
           ? [{ key: '/admin', icon: <SafetyCertificateOutlined />, label: <Link to="/admin">{tx('管理后台', 'Admin panel')}</Link> }]
           : []),
@@ -1552,6 +1565,7 @@ function AppContent() {
               <Route path="/auth" element={<AuthPage onAuthSuccess={persistSession} />} />
               <Route path="/booking" element={isEngineerOnly ? <Navigate to="/engineer" replace /> : <BookingPage currentUser={currentUser} deviceTypes={deviceTypes} repairItems={repairItems} refreshData={refreshData} />} />
               <Route path="/payment/:orderId" element={<PaymentPage currentUser={currentUser} refreshData={refreshData} />} />
+              <Route path="/forum" element={<FeedbackForumPage currentUser={currentUser} orders={orders} repairItems={repairItems} feedbackThreads={feedbackThreads} refreshData={refreshData} />} />
               <Route path="/user" element={isEngineerOnly ? <Navigate to="/engineer" replace /> : <UserCenterPage currentUser={currentUser} orders={orders} repairItems={repairItems} refreshData={refreshData} />} />
               <Route path="/engineer" element={<EngineerPage currentUser={currentUser} orders={orders} refreshOrders={refreshData} deviceTypes={deviceTypes} repairItems={repairItems} />} />
               <Route path="/admin" element={<AdminPage currentUser={currentUser} orders={orders} engineers={engineers} repairItems={repairItems} deviceTypes={deviceTypes} refreshOrders={refreshData} />} />

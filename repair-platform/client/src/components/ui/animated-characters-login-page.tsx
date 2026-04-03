@@ -203,7 +203,8 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
   const navigate = useNavigate();
   const { t, tx } = useLanguage();
   const [authMode, setAuthMode] = useState<AuthMode>('login');
-  const [showPassword, setShowPassword] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loginPhone, setLoginPhone] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -231,6 +232,7 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
   const orangeRef = useRef<HTMLDivElement>(null);
 
   const activePassword = authMode === 'login' ? loginPassword : registerForm.password;
+  const activePasswordVisible = authMode === 'login' ? showLoginPassword : showRegisterPassword;
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
@@ -289,7 +291,13 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
   }, [isTyping]);
 
   useEffect(() => {
-    if (!(activePassword.length > 0 && showPassword)) {
+    setIsTyping(false);
+    setIsLookingAtEachOther(false);
+    setIsPurplePeeking(false);
+  }, [authMode]);
+
+  useEffect(() => {
+    if (!(activePassword.length > 0 && activePasswordVisible)) {
       setIsPurplePeeking(false);
       return undefined;
     }
@@ -303,7 +311,7 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
     }, Math.random() * 3000 + 2000);
 
     return () => window.clearTimeout(peekTimeout);
-  }, [activePassword, showPassword, isPurplePeeking]);
+  }, [activePassword, activePasswordVisible, isPurplePeeking]);
 
   const calculatePosition = (ref: RefObject<HTMLDivElement>) => {
     if (!ref.current) {
@@ -339,7 +347,8 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
     setAuthMode('login');
     setLoginPhone(demo.phone);
     setLoginPassword(demo.password);
-    setShowPassword(false);
+    setShowLoginPassword(false);
+    setShowRegisterPassword(false);
     resetError();
   };
 
@@ -438,14 +447,14 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
               style={{
                 left: '70px',
                 width: '180px',
-                height: isTyping || (activePassword.length > 0 && !showPassword) ? '440px' : '400px',
+                height: isTyping || (activePassword.length > 0 && !activePasswordVisible) ? '440px' : '400px',
                 backgroundColor: '#6C3FF5',
                 borderRadius: '10px 10px 0 0',
                 zIndex: 1,
                 transform:
-                  activePassword.length > 0 && showPassword
+                  activePassword.length > 0 && activePasswordVisible
                     ? 'skewX(0deg)'
-                    : isTyping || (activePassword.length > 0 && !showPassword)
+                    : isTyping || (activePassword.length > 0 && !activePasswordVisible)
                       ? `skewX(${(purplePos.bodySkew || 0) - 12}deg) translateX(40px)`
                       : `skewX(${purplePos.bodySkew || 0}deg)`,
                 transformOrigin: 'bottom center'
@@ -454,8 +463,8 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
               <div
                 className="absolute flex gap-8 transition-all duration-700 ease-in-out"
                 style={{
-                  left: activePassword.length > 0 && showPassword ? '20px' : isLookingAtEachOther ? '55px' : `${45 + purplePos.faceX}px`,
-                  top: activePassword.length > 0 && showPassword ? '35px' : isLookingAtEachOther ? '65px' : `${40 + purplePos.faceY}px`
+                  left: activePassword.length > 0 && activePasswordVisible ? '20px' : isLookingAtEachOther ? '55px' : `${45 + purplePos.faceX}px`,
+                  top: activePassword.length > 0 && activePasswordVisible ? '35px' : isLookingAtEachOther ? '65px' : `${40 + purplePos.faceY}px`
                 }}
               >
                 <EyeBall
@@ -465,8 +474,8 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
                   eyeColor="white"
                   pupilColor="#2D2D2D"
                   isBlinking={isPurpleBlinking}
-                  forceLookX={activePassword.length > 0 && showPassword ? (isPurplePeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined}
-                  forceLookY={activePassword.length > 0 && showPassword ? (isPurplePeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined}
+                  forceLookX={activePassword.length > 0 && activePasswordVisible ? (isPurplePeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined}
+                  forceLookY={activePassword.length > 0 && activePasswordVisible ? (isPurplePeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined}
                 />
                 <EyeBall
                   size={18}
@@ -475,8 +484,8 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
                   eyeColor="white"
                   pupilColor="#2D2D2D"
                   isBlinking={isPurpleBlinking}
-                  forceLookX={activePassword.length > 0 && showPassword ? (isPurplePeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined}
-                  forceLookY={activePassword.length > 0 && showPassword ? (isPurplePeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined}
+                  forceLookX={activePassword.length > 0 && activePasswordVisible ? (isPurplePeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined}
+                  forceLookY={activePassword.length > 0 && activePasswordVisible ? (isPurplePeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined}
                 />
               </div>
             </div>
@@ -492,11 +501,11 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
                 borderRadius: '8px 8px 0 0',
                 zIndex: 2,
                 transform:
-                  activePassword.length > 0 && showPassword
+                  activePassword.length > 0 && activePasswordVisible
                     ? 'skewX(0deg)'
                     : isLookingAtEachOther
                       ? `skewX(${(blackPos.bodySkew || 0) * 1.5 + 10}deg) translateX(20px)`
-                      : isTyping || (activePassword.length > 0 && !showPassword)
+                      : isTyping || (activePassword.length > 0 && !activePasswordVisible)
                         ? `skewX(${(blackPos.bodySkew || 0) * 1.5}deg)`
                         : `skewX(${blackPos.bodySkew || 0}deg)`,
                 transformOrigin: 'bottom center'
@@ -505,8 +514,8 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
               <div
                 className="absolute flex gap-6 transition-all duration-700 ease-in-out"
                 style={{
-                  left: activePassword.length > 0 && showPassword ? '10px' : isLookingAtEachOther ? '32px' : `${26 + blackPos.faceX}px`,
-                  top: activePassword.length > 0 && showPassword ? '28px' : isLookingAtEachOther ? '12px' : `${32 + blackPos.faceY}px`
+                  left: activePassword.length > 0 && activePasswordVisible ? '10px' : isLookingAtEachOther ? '32px' : `${26 + blackPos.faceX}px`,
+                  top: activePassword.length > 0 && activePasswordVisible ? '28px' : isLookingAtEachOther ? '12px' : `${32 + blackPos.faceY}px`
                 }}
               >
                 <EyeBall
@@ -516,8 +525,8 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
                   eyeColor="white"
                   pupilColor="#2D2D2D"
                   isBlinking={isBlackBlinking}
-                  forceLookX={activePassword.length > 0 && showPassword ? -4 : isLookingAtEachOther ? 0 : undefined}
-                  forceLookY={activePassword.length > 0 && showPassword ? -4 : isLookingAtEachOther ? -4 : undefined}
+                  forceLookX={activePassword.length > 0 && activePasswordVisible ? -4 : isLookingAtEachOther ? 0 : undefined}
+                  forceLookY={activePassword.length > 0 && activePasswordVisible ? -4 : isLookingAtEachOther ? -4 : undefined}
                 />
                 <EyeBall
                   size={16}
@@ -526,8 +535,8 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
                   eyeColor="white"
                   pupilColor="#2D2D2D"
                   isBlinking={isBlackBlinking}
-                  forceLookX={activePassword.length > 0 && showPassword ? -4 : isLookingAtEachOther ? 0 : undefined}
-                  forceLookY={activePassword.length > 0 && showPassword ? -4 : isLookingAtEachOther ? -4 : undefined}
+                  forceLookX={activePassword.length > 0 && activePasswordVisible ? -4 : isLookingAtEachOther ? 0 : undefined}
+                  forceLookY={activePassword.length > 0 && activePasswordVisible ? -4 : isLookingAtEachOther ? -4 : undefined}
                 />
               </div>
             </div>
@@ -542,19 +551,19 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
                 zIndex: 3,
                 backgroundColor: '#FF9B6B',
                 borderRadius: '120px 120px 0 0',
-                transform: activePassword.length > 0 && showPassword ? 'skewX(0deg)' : `skewX(${orangePos.bodySkew || 0}deg)`,
+                transform: activePassword.length > 0 && activePasswordVisible ? 'skewX(0deg)' : `skewX(${orangePos.bodySkew || 0}deg)`,
                 transformOrigin: 'bottom center'
               }}
             >
               <div
                 className="absolute flex gap-8 transition-all duration-200 ease-out"
                 style={{
-                  left: activePassword.length > 0 && showPassword ? '50px' : `${82 + (orangePos.faceX || 0)}px`,
-                  top: activePassword.length > 0 && showPassword ? '85px' : `${90 + (orangePos.faceY || 0)}px`
+                  left: activePassword.length > 0 && activePasswordVisible ? '50px' : `${82 + (orangePos.faceX || 0)}px`,
+                  top: activePassword.length > 0 && activePasswordVisible ? '85px' : `${90 + (orangePos.faceY || 0)}px`
                 }}
               >
-                <Pupil size={12} maxDistance={5} pupilColor="#2D2D2D" forceLookX={activePassword.length > 0 && showPassword ? -5 : undefined} forceLookY={activePassword.length > 0 && showPassword ? -4 : undefined} />
-                <Pupil size={12} maxDistance={5} pupilColor="#2D2D2D" forceLookX={activePassword.length > 0 && showPassword ? -5 : undefined} forceLookY={activePassword.length > 0 && showPassword ? -4 : undefined} />
+                <Pupil size={12} maxDistance={5} pupilColor="#2D2D2D" forceLookX={activePassword.length > 0 && activePasswordVisible ? -5 : undefined} forceLookY={activePassword.length > 0 && activePasswordVisible ? -4 : undefined} />
+                <Pupil size={12} maxDistance={5} pupilColor="#2D2D2D" forceLookX={activePassword.length > 0 && activePasswordVisible ? -5 : undefined} forceLookY={activePassword.length > 0 && activePasswordVisible ? -4 : undefined} />
               </div>
             </div>
 
@@ -568,25 +577,25 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
                 backgroundColor: '#E8D754',
                 borderRadius: '70px 70px 0 0',
                 zIndex: 4,
-                transform: activePassword.length > 0 && showPassword ? 'skewX(0deg)' : `skewX(${yellowPos.bodySkew || 0}deg)`,
+                transform: activePassword.length > 0 && activePasswordVisible ? 'skewX(0deg)' : `skewX(${yellowPos.bodySkew || 0}deg)`,
                 transformOrigin: 'bottom center'
               }}
             >
               <div
                 className="absolute flex gap-6 transition-all duration-200 ease-out"
                 style={{
-                  left: activePassword.length > 0 && showPassword ? '20px' : `${52 + (yellowPos.faceX || 0)}px`,
-                  top: activePassword.length > 0 && showPassword ? '35px' : `${40 + (yellowPos.faceY || 0)}px`
+                  left: activePassword.length > 0 && activePasswordVisible ? '20px' : `${52 + (yellowPos.faceX || 0)}px`,
+                  top: activePassword.length > 0 && activePasswordVisible ? '35px' : `${40 + (yellowPos.faceY || 0)}px`
                 }}
               >
-                <Pupil size={12} maxDistance={5} pupilColor="#2D2D2D" forceLookX={activePassword.length > 0 && showPassword ? -5 : undefined} forceLookY={activePassword.length > 0 && showPassword ? -4 : undefined} />
-                <Pupil size={12} maxDistance={5} pupilColor="#2D2D2D" forceLookX={activePassword.length > 0 && showPassword ? -5 : undefined} forceLookY={activePassword.length > 0 && showPassword ? -4 : undefined} />
+                <Pupil size={12} maxDistance={5} pupilColor="#2D2D2D" forceLookX={activePassword.length > 0 && activePasswordVisible ? -5 : undefined} forceLookY={activePassword.length > 0 && activePasswordVisible ? -4 : undefined} />
+                <Pupil size={12} maxDistance={5} pupilColor="#2D2D2D" forceLookX={activePassword.length > 0 && activePasswordVisible ? -5 : undefined} forceLookY={activePassword.length > 0 && activePasswordVisible ? -4 : undefined} />
               </div>
               <div
                 className="absolute h-[4px] w-20 rounded-full bg-[#2D2D2D] transition-all duration-200 ease-out"
                 style={{
-                  left: activePassword.length > 0 && showPassword ? '10px' : `${40 + (yellowPos.faceX || 0)}px`,
-                  top: activePassword.length > 0 && showPassword ? '88px' : `${88 + (yellowPos.faceY || 0)}px`
+                  left: activePassword.length > 0 && activePasswordVisible ? '10px' : `${40 + (yellowPos.faceX || 0)}px`,
+                  top: activePassword.length > 0 && activePasswordVisible ? '88px' : `${88 + (yellowPos.faceY || 0)}px`
                 }}
               />
             </div>
@@ -631,6 +640,8 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
               type="button"
               onClick={() => {
                 setAuthMode('login');
+                setShowLoginPassword(false);
+                setShowRegisterPassword(false);
                 resetError();
               }}
               className={cn(
@@ -644,6 +655,8 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
               type="button"
               onClick={() => {
                 setAuthMode('register');
+                setShowLoginPassword(false);
+                setShowRegisterPassword(false);
                 resetError();
               }}
               className={cn(
@@ -667,15 +680,18 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
           </div>
 
           {authMode === 'login' ? (
-            <form onSubmit={handleLoginSubmit} className="space-y-5">
+            <form key="login-form" onSubmit={handleLoginSubmit} className="space-y-5" autoComplete="on">
               <div className="space-y-2">
                 <Label htmlFor="login-phone">{tx('手机号', 'Phone number')}</Label>
                 <Input
                   id="login-phone"
+                  name="loginPhone"
                   type="tel"
                   placeholder={tx('例如：13800000000', 'Example: 13800000000')}
                   value={loginPhone}
-                  autoComplete="username"
+                  autoComplete="tel"
+                  inputMode="tel"
+                  spellCheck={false}
                   onChange={(event) => {
                     setLoginPhone(event.target.value);
                     resetError();
@@ -692,7 +708,8 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
                 <div className="relative">
                   <Input
                     id="login-password"
-                    type={showPassword ? 'text' : 'password'}
+                    name="loginPassword"
+                    type={showLoginPassword ? 'text' : 'password'}
                     placeholder="••••••••"
                     value={loginPassword}
                     autoComplete="current-password"
@@ -707,10 +724,11 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword((current) => !current)}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => setShowLoginPassword((current) => !current)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
                   >
-                    {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+                    {showLoginPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
                   </button>
                 </div>
               </div>
@@ -734,14 +752,19 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
               </Button>
             </form>
           ) : (
-            <form onSubmit={handleRegisterSubmit} className="space-y-5">
+            <form key="register-form" onSubmit={handleRegisterSubmit} className="space-y-5" autoComplete="on">
               <div className="grid gap-5 sm:grid-cols-2">
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="register-nickname">{tx('昵称', 'Nickname')}</Label>
                   <Input
                     id="register-nickname"
+                    name="registerNickname"
+                    type="text"
                     placeholder={tx('请输入昵称', 'Enter your nickname')}
                     value={registerForm.nickname}
+                    autoComplete="nickname"
+                    autoCorrect="off"
+                    spellCheck={false}
                     onChange={(event) => updateRegisterForm('nickname', event.target.value)}
                     onFocus={() => setIsTyping(true)}
                     onBlur={() => setIsTyping(false)}
@@ -754,9 +777,13 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
                   <Label htmlFor="register-phone">{tx('手机号', 'Phone number')}</Label>
                   <Input
                     id="register-phone"
+                    name="registerPhone"
                     type="tel"
                     placeholder={tx('请输入手机号', 'Enter your phone number')}
                     value={registerForm.phone}
+                    autoComplete="tel"
+                    inputMode="tel"
+                    spellCheck={false}
                     onChange={(event) => updateRegisterForm('phone', event.target.value)}
                     onFocus={() => setIsTyping(true)}
                     onBlur={() => setIsTyping(false)}
@@ -770,9 +797,11 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
                   <div className="relative">
                     <Input
                       id="register-password"
-                      type={showPassword ? 'text' : 'password'}
+                      name="registerPassword"
+                      type={showRegisterPassword ? 'text' : 'password'}
                       placeholder={tx('至少 6 位密码', 'At least 6 characters')}
                       value={registerForm.password}
+                      autoComplete="new-password"
                       onChange={(event) => updateRegisterForm('password', event.target.value)}
                       onFocus={() => setIsTyping(true)}
                       onBlur={() => setIsTyping(false)}
@@ -782,10 +811,11 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
                     />
                     <button
                       type="button"
-                      onClick={() => setShowPassword((current) => !current)}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => setShowRegisterPassword((current) => !current)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
                     >
-                      {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+                      {showRegisterPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
                     </button>
                   </div>
                 </div>
@@ -822,8 +852,12 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
                     <Label htmlFor="engineer-name">{tx('真实姓名', 'Full name')}</Label>
                     <Input
                       id="engineer-name"
+                      name="engineerRealName"
+                      type="text"
                       placeholder={tx('例如：张工', 'Example: Engineer Zhang')}
                       value={registerForm.realName}
+                      autoComplete="name"
+                      autoCorrect="off"
                       onChange={(event) => updateRegisterForm('realName', event.target.value)}
                       onFocus={() => setIsTyping(true)}
                       onBlur={() => setIsTyping(false)}
@@ -836,8 +870,12 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
                     <Label htmlFor="engineer-area">{tx('服务区域', 'Service area')}</Label>
                     <Input
                       id="engineer-area"
+                      name="engineerServiceArea"
+                      type="text"
                       placeholder={tx('例如：Sydney CBD / Zetland', 'Example: Sydney CBD / Zetland')}
                       value={registerForm.serviceArea}
+                      autoComplete="street-address"
+                      autoCorrect="off"
                       onChange={(event) => updateRegisterForm('serviceArea', event.target.value)}
                       onFocus={() => setIsTyping(true)}
                       onBlur={() => setIsTyping(false)}
@@ -850,8 +888,10 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
                     <Label htmlFor="engineer-skill">{tx('技能描述', 'Skill summary')}</Label>
                     <textarea
                       id="engineer-skill"
+                      name="engineerSkillDesc"
                       placeholder={tx('例如：擅长手机换屏、主板维修、电池更换', 'Example: Specialised in screen replacement, logic board repair, and battery service')}
                       value={registerForm.skillDesc}
+                      autoComplete="off"
                       onChange={(event) => updateRegisterForm('skillDesc', event.target.value)}
                       onFocus={() => setIsTyping(true)}
                       onBlur={() => setIsTyping(false)}
@@ -907,6 +947,8 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
               type="button"
               onClick={() => {
                 setAuthMode((current) => (current === 'login' ? 'register' : 'login'));
+                setShowLoginPassword(false);
+                setShowRegisterPassword(false);
                 resetError();
               }}
               className="font-medium text-foreground underline-offset-4 hover:underline"

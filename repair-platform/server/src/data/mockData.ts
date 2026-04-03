@@ -4,6 +4,7 @@ export type UserRole = 'customer' | 'engineer' | 'admin';
 export type UserStatus = 'active' | 'disabled';
 export type OrderPaymentStatus = '待支付' | '已支付' | '支付失败';
 export type OrderStatus = '待支付' | '待分配' | '待上门' | '服务中' | '待评价' | '已完成' | '已取消';
+export type FeedbackScope = 'order' | 'platform';
 
 export interface User {
   id: number;
@@ -75,6 +76,26 @@ export interface Order {
   transactionId?: string;
   paidAt?: string;
   paymentQrCode?: string;
+}
+
+export interface FeedbackReply {
+  id: number;
+  threadId: number;
+  authorUserId: number;
+  content: string;
+  createdAt: string;
+}
+
+export interface FeedbackThread {
+  id: number;
+  scope: FeedbackScope;
+  orderId: number | null;
+  authorUserId: number;
+  title: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  replies: FeedbackReply[];
 }
 
 interface CreateUserInput {
@@ -376,6 +397,8 @@ export const orders: Order[] = [
   }
 ];
 
+export const feedbackThreads: FeedbackThread[] = [];
+
 export function sanitizeUser(user: User): PublicUser {
   const engineerProfile = getEngineerByUserId(user.id);
   return {
@@ -477,6 +500,10 @@ export function createOrder(input: Omit<Order, 'id' | 'orderNo' | 'createdAt'>) 
   return order;
 }
 
+export function getFeedbackThreadById(id: number) {
+  return feedbackThreads.find((thread) => thread.id === id);
+}
+
 export function canAccessOrder(user: User, order: Order) {
   if (user.role === 'admin') {
     return true;
@@ -488,6 +515,68 @@ export function canAccessOrder(user: User, order: Order) {
 
   const engineer = getEngineerByUserId(user.id);
   return order.engineerId === engineer?.id || order.status === '待分配';
+}
+
+export function canAccessFeedbackThread(user: User, thread: FeedbackThread) {
+  if (user.role === 'admin') {
+    return true;
+  }
+
+  if (thread.scope === 'platform') {
+    return true;
+  }
+
+  if (!thread.orderId) {
+    return thread.authorUserId === user.id;
+  }
+
+  const order = getOrderById(thread.orderId);
+  if (!order) {
+    return false;
+  }
+
+  return canAccessOrder(user, order) || thread.authorUserId === user.id;
+}
+
+export function getFeedbackThreadsForUser(user: User) {
+  return feedbackThreads
+    .filter((thread) => canAccessFeedbackThread(user, thread))
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+}
+
+export function createFeedbackThread(input: {
+  scope: FeedbackScope;
+  orderId: number | null;
+  authorUserId: number;
+  title: string;
+  content: string;
+}) {
+  const thread: FeedbackThread = {
+    id: Math.max(0, ...feedbackThreads.map((item) => item.id)) + 1,
+    scope: input.scope,
+    orderId: input.orderId,
+    authorUserId: input.authorUserId,
+    title: input.title,
+    content: input.content,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+    replies: []
+  };
+  feedbackThreads.unshift(thread);
+  return thread;
+}
+
+export function addFeedbackReply(thread: FeedbackThread, input: { authorUserId: number; content: string }) {
+  const reply: FeedbackReply = {
+    id: Math.max(0, ...feedbackThreads.flatMap((item) => item.replies.map((replyItem) => replyItem.id))) + 1,
+    threadId: thread.id,
+    authorUserId: input.authorUserId,
+    content: input.content,
+    createdAt: nowIso()
+  };
+  thread.replies.push(reply);
+  thread.updatedAt = reply.createdAt;
+  return reply;
 }
 
 export function markOrderAsPendingPayment(order: Order, paymentMethod: string) {

@@ -3,12 +3,20 @@ import dotenv from 'dotenv';
 import express, { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import {
+  addFeedbackReply,
   canAccessOrder,
+  canAccessFeedbackThread,
+  createFeedbackThread,
   createEngineerProfile,
   createOrder,
   createUser,
   deviceTypes,
   engineers,
+  FeedbackReply,
+  FeedbackThread,
+  FeedbackScope,
+  getFeedbackThreadById,
+  getFeedbackThreadsForUser,
   getEngineerById,
   getEngineerByUserId,
   getOrderById,
@@ -47,6 +55,21 @@ type OrderView = Order & {
   engineerName?: string;
   repairItemName?: string;
   deviceTypeName?: string;
+};
+
+type FeedbackReplyView = FeedbackReply & {
+  authorName?: string;
+  authorRole?: UserRole;
+};
+
+type FeedbackThreadView = FeedbackThread & {
+  authorName?: string;
+  authorRole?: UserRole;
+  orderNo?: string;
+  repairItemName?: string;
+  customerNickname?: string;
+  engineerName?: string;
+  replies: FeedbackReplyView[];
 };
 
 type TokenPayload = {
@@ -155,6 +178,45 @@ function presentOrder(order: Order): OrderView {
 
 function presentOrders(items: Order[]) {
   return items.map((item) => presentOrder(item));
+}
+
+function getUserDisplayName(user?: User) {
+  if (!user) {
+    return undefined;
+  }
+  return getEngineerByUserId(user.id)?.realName ?? user.nickname;
+}
+
+function presentFeedbackReply(reply: FeedbackReply): FeedbackReplyView {
+  const author = getUserById(reply.authorUserId);
+  return {
+    ...reply,
+    authorName: getUserDisplayName(author),
+    authorRole: author?.role
+  };
+}
+
+function presentFeedbackThread(thread: FeedbackThread): FeedbackThreadView {
+  const author = getUserById(thread.authorUserId);
+  const linkedOrder = thread.orderId ? getOrderById(thread.orderId) : undefined;
+  const customer = linkedOrder ? getUserById(linkedOrder.userId) : undefined;
+  const assignedEngineer = linkedOrder?.engineerId ? getEngineerById(linkedOrder.engineerId) : undefined;
+  const repairItem = linkedOrder ? getRepairItemById(linkedOrder.repairItemId) : undefined;
+
+  return {
+    ...thread,
+    authorName: getUserDisplayName(author),
+    authorRole: author?.role,
+    orderNo: linkedOrder?.orderNo,
+    repairItemName: repairItem?.name,
+    customerNickname: customer?.nickname,
+    engineerName: assignedEngineer?.realName,
+    replies: thread.replies.map((reply) => presentFeedbackReply(reply))
+  };
+}
+
+function presentFeedbackThreads(items: FeedbackThread[]) {
+  return items.map((item) => presentFeedbackThread(item));
 }
 
 app.get('/api/health', (_req: Request, res: Response) => {
@@ -366,6 +428,80 @@ app.post('/api/orders/:id/review', requireAuth(['customer', 'admin']), (req: Req
 
   order.status = '已完成';
   return res.json({ success: true, data: { order: presentOrder(order), review: req.body } });
+});
+
+app.get('/api/feedback', requireAuth(), (req: Request, res: Response) => {
+  const currentUser = (req as RawBodyRequest).authUser!;
+  return res.json({ success: true, data: presentFeedbackThreads(getFeedbackThreadsForUser(currentUser)) });
+});
+
+app.post('/api/feedback', requireAuth(), (req: Request, res: Response) => {
+  const currentUser = (req as RawBodyRequest).authUser!;
+  const { scope, orderId, title, content } = req.body as {
+    scope?: FeedbackScope;
+    orderId?: number;
+    title?: string;
+    content?: string;
+  };
+
+  if (!title?.trim() || !content?.trim()) {
+    return res.status(400).json({ success: false, message: 'Feedback title and content are required.' });
+  }
+
+  if (scope !== 'order' && scope !== 'platform') {
+    return res.status(400).json({ success: false, message: 'Feedback scope must be order or platform.' });
+  }
+
+  let linkedOrder: Order | undefined;
+  if (scope === 'order') {
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: 'Order feedback must be linked to an order.' });
+    }
+
+    linkedOrder = getOrderById(Number(orderId));
+    if (!linkedOrder) {
+      return res.status(404).json({ success: false, message: 'Order not found.' });
+    }
+
+    if (!canAccessOrder(currentUser, linkedOrder)) {
+      return res.status(403).json({ success: false, message: 'You cannot create feedback for this order.' });
+    }
+  }
+
+  const thread = createFeedbackThread({
+    scope,
+    orderId: scope === 'order' ? Number(orderId) : null,
+    authorUserId: currentUser.id,
+    title: title.trim(),
+    content: content.trim()
+  });
+
+  return res.status(201).json({ success: true, data: presentFeedbackThread(thread) });
+});
+
+app.post('/api/feedback/:id/replies', requireAuth(), (req: Request, res: Response) => {
+  const currentUser = (req as RawBodyRequest).authUser!;
+  const thread = getFeedbackThreadById(Number(req.params.id));
+  const { content } = req.body as { content?: string };
+
+  if (!thread) {
+    return res.status(404).json({ success: false, message: 'Feedback thread not found.' });
+  }
+
+  if (!canAccessFeedbackThread(currentUser, thread)) {
+    return res.status(403).json({ success: false, message: 'You do not have permission to view this feedback thread.' });
+  }
+
+  if (!content?.trim()) {
+    return res.status(400).json({ success: false, message: 'Reply content is required.' });
+  }
+
+  addFeedbackReply(thread, {
+    authorUserId: currentUser.id,
+    content: content.trim()
+  });
+
+  return res.status(201).json({ success: true, data: presentFeedbackThread(thread) });
 });
 
 app.get('/api/payments/wechat/readiness', requireAuth(), (_req: Request, res: Response) => {
