@@ -236,7 +236,7 @@ app.get('/api/auth/demo-accounts', (_req: Request, res: Response) => {
   });
 });
 
-app.post('/api/auth/register', (req: Request, res: Response) => {
+app.post('/api/auth/register', async (req: Request, res: Response) => {
   const { phone, password, nickname, role, realName, skillDesc, serviceArea } = req.body as {
     phone?: string;
     password?: string;
@@ -264,10 +264,10 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
   }
 
   try {
-    const user = createUser({ phone, password, nickname, role: role as 'customer' | 'engineer' });
+    const user = await createUser({ phone, password, nickname, role: role as 'customer' | 'engineer' });
 
     if (role === 'engineer') {
-      createEngineerProfile({
+      await createEngineerProfile({
         userId: user.id,
         realName: realName || nickname,
         skillDesc: skillDesc || '新入驻工程师，等待完善技能简介。',
@@ -770,7 +770,7 @@ async function startServer() {
       console.log(`Repair platform API listening on http://localhost:${PORT}`);
     });
   } catch (error) {
-    console.error('Failed to initialize the local account database.', error);
+    console.error('Failed to initialize the account database.', error);
     process.exit(1);
   }
 }

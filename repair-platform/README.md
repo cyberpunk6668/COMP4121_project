@@ -4,7 +4,7 @@
 
 - 前端：React 18 + TypeScript + Vite + Ant Design
 - 后端：Node.js + Express + TypeScript
-- 数据层：客户与工程师账号信息使用本地 SQLite 持久化存储，订单等演示数据仍使用内存 Mock，便于快速演示
+- 数据层：客户与工程师账号信息支持本地 SQLite 或真实 MySQL 持久化存储，订单等演示数据仍使用内存 Mock，便于快速演示
 
 ## 已实现的 MVP 页面与能力
 
@@ -34,7 +34,7 @@ repair-platform/
 
 1. 先验证页面流程和业务闭环是否合理
 2. 先把接口结构、页面结构、角色结构定下来
-3. 先把账号体系落到本地 SQLite，后续再把订单/消息等数据迁移到真实数据库时成本更低
+3. 先把账号体系稳定下来；开发时可用本地 SQLite，接入真实数据库时可切换到 MySQL，后续再把订单/消息等数据迁移过去
 4. 更容易演示、答辩、继续扩展并推送到 GitHub
 
 ## 本地运行
@@ -54,6 +54,8 @@ repair-platform/
 默认地址：`http://localhost:4000`
 
 后端首次启动时会自动在 `repair-platform/server/storage/repair-platform.sqlite` 创建本地数据库文件，用来持久保存客户和工程师账号信息。
+
+如果你想切换到真实 MySQL 数据库，请在 `repair-platform/server/.env` 中把 `AUTH_DATABASE_PROVIDER` 改成 `mysql`，并填好 `MYSQL_HOST`、`MYSQL_PORT`、`MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_DATABASE`。服务启动时会自动创建 `users` 和 `engineers` 表，并在数据库为空时写入演示账号。
 
 ### 3. 启动前端
 
@@ -124,6 +126,18 @@ repair-platform/server/certs/
 - `WECHAT_PAY_PRIVATE_KEY_PATH=server/certs/apiclient_key.pem`
 - `WECHAT_PAY_PLATFORM_PUBLIC_KEY_PATH=server/certs/wechatpay_platform_public_key.pem`
 - `WECHAT_PAY_NOTIFY_URL=https://你的公网域名/api/payments/wechat/notify`
+
+## 用 MySQL Shell for VS Code 连接真实数据库
+
+如果你已经安装了 **MySQL Shell for VS Code** 扩展，可以这样把项目和真实数据库对上：
+
+1. 在扩展里新建一个 MySQL 连接，参数与 `repair-platform/server/.env` 中的 `MYSQL_HOST`、`MYSQL_PORT`、`MYSQL_USER`、`MYSQL_PASSWORD` 保持一致。
+2. 连接成功后，运行 `repair-platform/server/sql/mysql-auth-schema.sql`，或者直接让项目在首次启动时自动建库建表。
+3. 把 `repair-platform/server/.env` 里的 `AUTH_DATABASE_PROVIDER` 改成 `mysql`。
+4. 启动后端：`npm run dev:server`
+5. 注册新客户或工程师账号后，在扩展里刷新 `repair_platform.users` 和 `repair_platform.engineers` 表即可看到真实数据库中的数据。
+
+> 提示：如果你暂时还没准备好真实 MySQL，保留 `AUTH_DATABASE_PROVIDER=sqlite` 就会继续使用本地 `server/storage/repair-platform.sqlite`。
 
 ### 已提供的接口
 

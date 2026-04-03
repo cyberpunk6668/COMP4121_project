@@ -377,8 +377,8 @@ export async function initializeMockData() {
     engineers: seedEngineers
   });
 
-  users.splice(0, users.length, ...loadUsersFromDatabase());
-  engineers.splice(0, engineers.length, ...loadEngineersFromDatabase());
+  users.splice(0, users.length, ...(await loadUsersFromDatabase()));
+  engineers.splice(0, engineers.length, ...(await loadEngineersFromDatabase()));
 }
 
 export const orders: Order[] = [
@@ -451,7 +451,7 @@ export function getEngineerById(id: number) {
   return engineers.find((engineer) => engineer.id === id);
 }
 
-export function createUser(input: CreateUserInput) {
+export async function createUser(input: CreateUserInput) {
   if (getUserByPhone(input.phone)) {
     throw new Error('This phone number has already been registered.');
   }
@@ -466,7 +466,7 @@ export function createUser(input: CreateUserInput) {
   };
 
   const user: User = isAuthDatabaseInitialized()
-    ? insertUserRecord(userData)
+    ? await insertUserRecord(userData)
     : {
         id: users.length + 1,
         ...userData
@@ -476,7 +476,7 @@ export function createUser(input: CreateUserInput) {
   return user;
 }
 
-export function createEngineerProfile(input: CreateEngineerInput) {
+export async function createEngineerProfile(input: CreateEngineerInput) {
   const existingEngineer = getEngineerByUserId(input.userId);
   if (existingEngineer) {
     return existingEngineer;
@@ -494,7 +494,7 @@ export function createEngineerProfile(input: CreateEngineerInput) {
   };
 
   const engineer: Engineer = isAuthDatabaseInitialized()
-    ? insertEngineerRecord(engineerData)
+    ? await insertEngineerRecord(engineerData)
     : {
         id: engineers.length + 1,
         ...engineerData

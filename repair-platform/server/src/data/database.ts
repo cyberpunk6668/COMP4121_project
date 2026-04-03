@@ -2,14 +2,16 @@ import fs from 'fs';
 import path from 'path';
 
 import dotenv from 'dotenv';
+import mysql, { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import initSqlJs from 'sql.js';
 
-type BindParams = initSqlJs.BindParams;
-type SqlDatabase = initSqlJs.Database;
+type SqliteBindParams = initSqlJs.BindParams;
+type SqliteDatabase = initSqlJs.Database;
 type SqlJsStatic = initSqlJs.SqlJsStatic;
 type SqlValue = initSqlJs.SqlValue;
 
-type SqlRow = Record<string, SqlValue>;
+type SqliteRow = Record<string, SqlValue>;
+type DatabaseProvider = 'sqlite' | 'mysql';
 
 export type PersistedUserRole = 'customer' | 'engineer' | 'admin';
 export type PersistedUserStatus = 'active' | 'disabled';
@@ -41,9 +43,22 @@ interface SeedAuthData {
   engineers: PersistedEngineerRecord[];
 }
 
+interface MySqlConfig {
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  database: string;
+  ssl: boolean;
+  createDatabaseIfNotExists: boolean;
+  connectionLimit: number;
+}
+
 let sqliteModule: SqlJsStatic | undefined;
-let database: SqlDatabase | undefined;
-let databasePath: string | undefined;
+let sqliteDatabase: SqliteDatabase | undefined;
+let sqliteDatabasePath: string | undefined;
+let mysqlPool: Pool | undefined;
+let activeProvider: DatabaseProvider | undefined;
 let initializationPromise: Promise<void> | undefined;
 
 function resolveServerRoot() {
@@ -59,6 +74,57 @@ function resolveDatabasePath() {
   return path.resolve(resolveServerRoot(), process.env.DATABASE_PATH || 'storage/repair-platform.sqlite');
 }
 
+function resolveConfiguredProvider(): DatabaseProvider {
+  ensureEnvironmentLoaded();
+
+  const configuredProvider = (process.env.AUTH_DATABASE_PROVIDER || 'sqlite').trim().toLowerCase();
+  return configuredProvider === 'mysql' ? 'mysql' : 'sqlite';
+}
+
+function parseBoolean(value: string | undefined, defaultValue: boolean) {
+  if (value == null || value.trim() === '') {
+    return defaultValue;
+  }
+
+  return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
+}
+
+function getMySqlConfig(): MySqlConfig {
+  ensureEnvironmentLoaded();
+
+  const port = Number(process.env.MYSQL_PORT || 3306);
+  const connectionLimit = Number(process.env.MYSQL_CONNECTION_LIMIT || 10);
+
+  if (!Number.isFinite(port) || port <= 0) {
+    throw new Error('MYSQL_PORT must be a positive number.');
+  }
+
+  if (!Number.isFinite(connectionLimit) || connectionLimit <= 0) {
+    throw new Error('MYSQL_CONNECTION_LIMIT must be a positive number.');
+  }
+
+  return {
+    host: (process.env.MYSQL_HOST || '127.0.0.1').trim(),
+    port,
+    user: (process.env.MYSQL_USER || 'root').trim(),
+    password: process.env.MYSQL_PASSWORD || '',
+    database: (process.env.MYSQL_DATABASE || 'repair_platform').trim(),
+    ssl: parseBoolean(process.env.MYSQL_SSL, false),
+    createDatabaseIfNotExists: parseBoolean(process.env.MYSQL_CREATE_DATABASE_IF_NOT_EXISTS, true),
+    connectionLimit
+  };
+}
+
+function buildMySqlConnectionOptions(config: MySqlConfig) {
+  return {
+    host: config.host,
+    port: config.port,
+    user: config.user,
+    password: config.password,
+    ssl: config.ssl ? {} : undefined
+  };
+}
+
 async function getSqliteModule() {
   if (sqliteModule) {
     return sqliteModule;
@@ -69,29 +135,37 @@ async function getSqliteModule() {
   return sqliteModule;
 }
 
-function getDatabase() {
-  if (!database) {
-    throw new Error('Account database has not been initialized yet.');
+function getSqliteDatabase() {
+  if (!sqliteDatabase) {
+    throw new Error('SQLite account database has not been initialized yet.');
   }
 
-  return database;
+  return sqliteDatabase;
 }
 
-function writeDatabaseToDisk() {
-  if (!database) {
+function getMySqlPool() {
+  if (!mysqlPool) {
+    throw new Error('MySQL account database has not been initialized yet.');
+  }
+
+  return mysqlPool;
+}
+
+function writeSqliteDatabaseToDisk() {
+  if (!sqliteDatabase) {
     return;
   }
 
-  const targetPath = databasePath ?? resolveDatabasePath();
+  const targetPath = sqliteDatabasePath ?? resolveDatabasePath();
   fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-  fs.writeFileSync(targetPath, Buffer.from(database.export()));
+  fs.writeFileSync(targetPath, Buffer.from(sqliteDatabase.export()));
 }
 
-function queryAll(sql: string, params?: BindParams) {
-  const statement = getDatabase().prepare(sql, params);
+function querySqliteAll(sql: string, params?: SqliteBindParams) {
+  const statement = getSqliteDatabase().prepare(sql, params);
 
   try {
-    const rows: SqlRow[] = [];
+    const rows: SqliteRow[] = [];
     while (statement.step()) {
       rows.push(statement.getAsObject());
     }
@@ -101,21 +175,21 @@ function queryAll(sql: string, params?: BindParams) {
   }
 }
 
-function queryOne(sql: string, params?: BindParams) {
-  return queryAll(sql, params)[0];
+function querySqliteOne(sql: string, params?: SqliteBindParams) {
+  return querySqliteAll(sql, params)[0];
 }
 
-function readTableCount(tableName: 'users' | 'engineers') {
-  const result = queryOne(`SELECT COUNT(*) AS count FROM ${tableName}`);
+function readSqliteTableCount(tableName: 'users' | 'engineers') {
+  const result = querySqliteOne(`SELECT COUNT(*) AS count FROM ${tableName}`);
   return Number(result?.count ?? 0);
 }
 
-function readLastInsertId() {
-  const result = queryOne('SELECT last_insert_rowid() AS id');
+function readSqliteLastInsertId() {
+  const result = querySqliteOne('SELECT last_insert_rowid() AS id');
   return Number(result?.id ?? 0);
 }
 
-function mapUserRow(row: SqlRow): PersistedUserRecord {
+function mapUserRow(row: Record<string, unknown>): PersistedUserRecord {
   return {
     id: Number(row.id),
     phone: String(row.phone ?? ''),
@@ -127,7 +201,7 @@ function mapUserRow(row: SqlRow): PersistedUserRecord {
   };
 }
 
-function mapEngineerRow(row: SqlRow): PersistedEngineerRecord {
+function mapEngineerRow(row: Record<string, unknown>): PersistedEngineerRecord {
   return {
     id: Number(row.id),
     userId: Number(row.userId),
@@ -141,12 +215,188 @@ function mapEngineerRow(row: SqlRow): PersistedEngineerRecord {
   };
 }
 
+async function initializeSqliteAuthDatabase(seedData: SeedAuthData) {
+  const SQL = await getSqliteModule();
+  sqliteDatabasePath = resolveDatabasePath();
+
+  const existingBytes = fs.existsSync(sqliteDatabasePath) ? fs.readFileSync(sqliteDatabasePath) : undefined;
+  sqliteDatabase = new SQL.Database(existingBytes ? new Uint8Array(existingBytes) : undefined);
+
+  getSqliteDatabase().run('PRAGMA foreign_keys = ON;');
+  getSqliteDatabase().run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      phone TEXT NOT NULL UNIQUE,
+      nickname TEXT NOT NULL,
+      role TEXT NOT NULL,
+      passwordHash TEXT NOT NULL,
+      status TEXT NOT NULL,
+      createdAt TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS engineers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL UNIQUE,
+      realName TEXT NOT NULL,
+      skillDesc TEXT NOT NULL,
+      serviceArea TEXT NOT NULL,
+      avgRating REAL NOT NULL DEFAULT 5,
+      totalOrders INTEGER NOT NULL DEFAULT 0,
+      status INTEGER NOT NULL DEFAULT 0,
+      avatar TEXT NOT NULL,
+      FOREIGN KEY (userId) REFERENCES users (id)
+    );
+  `);
+
+  if (readSqliteTableCount('users') === 0) {
+    getSqliteDatabase().run('BEGIN TRANSACTION');
+
+    try {
+      for (const user of seedData.users) {
+        getSqliteDatabase().run(
+          `
+            INSERT INTO users (id, phone, nickname, role, passwordHash, status, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `,
+          [user.id, user.phone, user.nickname, user.role, user.passwordHash, user.status, user.createdAt]
+        );
+      }
+
+      for (const engineer of seedData.engineers) {
+        getSqliteDatabase().run(
+          `
+            INSERT INTO engineers (id, userId, realName, skillDesc, serviceArea, avgRating, totalOrders, status, avatar)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+          [
+            engineer.id,
+            engineer.userId,
+            engineer.realName,
+            engineer.skillDesc,
+            engineer.serviceArea,
+            engineer.avgRating,
+            engineer.totalOrders,
+            engineer.status,
+            engineer.avatar
+          ]
+        );
+      }
+
+      getSqliteDatabase().run('COMMIT');
+    } catch (error) {
+      getSqliteDatabase().run('ROLLBACK');
+      throw error;
+    }
+  }
+
+  writeSqliteDatabaseToDisk();
+}
+
+async function initializeMySqlAuthDatabase(seedData: SeedAuthData) {
+  const config = getMySqlConfig();
+  const bootstrapConnection = await mysql.createConnection(buildMySqlConnectionOptions(config));
+
+  try {
+    if (config.createDatabaseIfNotExists) {
+      await bootstrapConnection.query(
+        `CREATE DATABASE IF NOT EXISTS \`${config.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+      );
+    }
+  } finally {
+    await bootstrapConnection.end();
+  }
+
+  mysqlPool = mysql.createPool({
+    ...buildMySqlConnectionOptions(config),
+    database: config.database,
+    waitForConnections: true,
+    connectionLimit: config.connectionLimit,
+    queueLimit: 0,
+    charset: 'utf8mb4'
+  });
+
+  await getMySqlPool().query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      phone VARCHAR(32) NOT NULL UNIQUE,
+      nickname VARCHAR(120) NOT NULL,
+      role ENUM('customer', 'engineer', 'admin') NOT NULL,
+      passwordHash VARCHAR(255) NOT NULL,
+      status ENUM('active', 'disabled') NOT NULL,
+      createdAt DATETIME(3) NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  await getMySqlPool().query(`
+    CREATE TABLE IF NOT EXISTS engineers (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      userId INT NOT NULL UNIQUE,
+      realName VARCHAR(120) NOT NULL,
+      skillDesc TEXT NOT NULL,
+      serviceArea VARCHAR(255) NOT NULL,
+      avgRating DECIMAL(3, 2) NOT NULL DEFAULT 5.00,
+      totalOrders INT NOT NULL DEFAULT 0,
+      status INT NOT NULL DEFAULT 0,
+      avatar TEXT NOT NULL,
+      CONSTRAINT fk_engineers_user FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  const [userCountRows] = await getMySqlPool().query<RowDataPacket[]>('SELECT COUNT(*) AS count FROM users');
+  const userCount = Number(userCountRows[0]?.count ?? 0);
+
+  if (userCount === 0) {
+    const connection = await getMySqlPool().getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      for (const user of seedData.users) {
+        await connection.execute(
+          `
+            INSERT INTO users (id, phone, nickname, role, passwordHash, status, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `,
+          [user.id, user.phone, user.nickname, user.role, user.passwordHash, user.status, user.createdAt]
+        );
+      }
+
+      for (const engineer of seedData.engineers) {
+        await connection.execute(
+          `
+            INSERT INTO engineers (id, userId, realName, skillDesc, serviceArea, avgRating, totalOrders, status, avatar)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+          [
+            engineer.id,
+            engineer.userId,
+            engineer.realName,
+            engineer.skillDesc,
+            engineer.serviceArea,
+            engineer.avgRating,
+            engineer.totalOrders,
+            engineer.status,
+            engineer.avatar
+          ]
+        );
+      }
+
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+}
+
 export function isAuthDatabaseInitialized() {
-  return Boolean(database);
+  return Boolean(sqliteDatabase || mysqlPool);
 }
 
 export async function initializeAuthDatabase(seedData: SeedAuthData) {
-  if (database) {
+  if (isAuthDatabaseInitialized()) {
     return;
   }
 
@@ -154,94 +404,48 @@ export async function initializeAuthDatabase(seedData: SeedAuthData) {
     return initializationPromise;
   }
 
-  initializationPromise = (async () => {
+  const setupPromise = (async () => {
     try {
-      const SQL = await getSqliteModule();
-      databasePath = resolveDatabasePath();
+      activeProvider = resolveConfiguredProvider();
 
-      const existingBytes = fs.existsSync(databasePath) ? fs.readFileSync(databasePath) : undefined;
-      database = new SQL.Database(existingBytes ? new Uint8Array(existingBytes) : undefined);
+      if (activeProvider === 'mysql') {
+        await initializeMySqlAuthDatabase(seedData);
+      } else {
+        await initializeSqliteAuthDatabase(seedData);
+      }
+    } catch (error) {
+      sqliteDatabase?.close();
+      sqliteDatabase = undefined;
 
-      getDatabase().run('PRAGMA foreign_keys = ON;');
-      getDatabase().run(`
-        CREATE TABLE IF NOT EXISTS users (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          phone TEXT NOT NULL UNIQUE,
-          nickname TEXT NOT NULL,
-          role TEXT NOT NULL,
-          passwordHash TEXT NOT NULL,
-          status TEXT NOT NULL,
-          createdAt TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS engineers (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          userId INTEGER NOT NULL UNIQUE,
-          realName TEXT NOT NULL,
-          skillDesc TEXT NOT NULL,
-          serviceArea TEXT NOT NULL,
-          avgRating REAL NOT NULL DEFAULT 5,
-          totalOrders INTEGER NOT NULL DEFAULT 0,
-          status INTEGER NOT NULL DEFAULT 0,
-          avatar TEXT NOT NULL,
-          FOREIGN KEY (userId) REFERENCES users (id)
-        );
-      `);
-
-      if (readTableCount('users') === 0) {
-        getDatabase().run('BEGIN TRANSACTION');
-
-        try {
-          for (const user of seedData.users) {
-            getDatabase().run(
-              `
-                INSERT INTO users (id, phone, nickname, role, passwordHash, status, createdAt)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-              `,
-              [user.id, user.phone, user.nickname, user.role, user.passwordHash, user.status, user.createdAt]
-            );
-          }
-
-          for (const engineer of seedData.engineers) {
-            getDatabase().run(
-              `
-                INSERT INTO engineers (id, userId, realName, skillDesc, serviceArea, avgRating, totalOrders, status, avatar)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-              `,
-              [
-                engineer.id,
-                engineer.userId,
-                engineer.realName,
-                engineer.skillDesc,
-                engineer.serviceArea,
-                engineer.avgRating,
-                engineer.totalOrders,
-                engineer.status,
-                engineer.avatar
-              ]
-            );
-          }
-
-          getDatabase().run('COMMIT');
-        } catch (error) {
-          getDatabase().run('ROLLBACK');
-          throw error;
-        }
+      if (mysqlPool) {
+        await mysqlPool.end();
+        mysqlPool = undefined;
       }
 
-      writeDatabaseToDisk();
-    } catch (error) {
-      database?.close();
-      database = undefined;
+      activeProvider = undefined;
       throw error;
     }
   })();
 
+  initializationPromise = setupPromise.finally(() => {
+    initializationPromise = undefined;
+  });
+
   return initializationPromise;
 }
 
-export function loadUsersFromDatabase() {
-  return queryAll(
+export async function loadUsersFromDatabase() {
+  if (activeProvider === 'mysql') {
+    const [rows] = await getMySqlPool().query<RowDataPacket[]>(`
+      SELECT id, phone, nickname, role, passwordHash, status, createdAt
+      FROM users
+      ORDER BY id ASC
+    `);
+
+    return rows.map((row) => mapUserRow(row as unknown as Record<string, unknown>));
+  }
+
+  return querySqliteAll(
     `
       SELECT id, phone, nickname, role, passwordHash, status, createdAt
       FROM users
@@ -250,8 +454,18 @@ export function loadUsersFromDatabase() {
   ).map((row) => mapUserRow(row));
 }
 
-export function loadEngineersFromDatabase() {
-  return queryAll(
+export async function loadEngineersFromDatabase() {
+  if (activeProvider === 'mysql') {
+    const [rows] = await getMySqlPool().query<RowDataPacket[]>(`
+      SELECT id, userId, realName, skillDesc, serviceArea, avgRating, totalOrders, status, avatar
+      FROM engineers
+      ORDER BY id ASC
+    `);
+
+    return rows.map((row) => mapEngineerRow(row as unknown as Record<string, unknown>));
+  }
+
+  return querySqliteAll(
     `
       SELECT id, userId, realName, skillDesc, serviceArea, avgRating, totalOrders, status, avatar
       FROM engineers
@@ -260,8 +474,23 @@ export function loadEngineersFromDatabase() {
   ).map((row) => mapEngineerRow(row));
 }
 
-export function insertUserRecord(input: Omit<PersistedUserRecord, 'id'>) {
-  getDatabase().run(
+export async function insertUserRecord(input: Omit<PersistedUserRecord, 'id'>) {
+  if (activeProvider === 'mysql') {
+    const [result] = await getMySqlPool().execute<ResultSetHeader>(
+      `
+        INSERT INTO users (phone, nickname, role, passwordHash, status, createdAt)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `,
+      [input.phone, input.nickname, input.role, input.passwordHash, input.status, input.createdAt]
+    );
+
+    return {
+      id: Number(result.insertId),
+      ...input
+    };
+  }
+
+  getSqliteDatabase().run(
     `
       INSERT INTO users (phone, nickname, role, passwordHash, status, createdAt)
       VALUES (?, ?, ?, ?, ?, ?)
@@ -270,16 +499,31 @@ export function insertUserRecord(input: Omit<PersistedUserRecord, 'id'>) {
   );
 
   const user: PersistedUserRecord = {
-    id: readLastInsertId(),
+    id: readSqliteLastInsertId(),
     ...input
   };
 
-  writeDatabaseToDisk();
+  writeSqliteDatabaseToDisk();
   return user;
 }
 
-export function insertEngineerRecord(input: Omit<PersistedEngineerRecord, 'id'>) {
-  getDatabase().run(
+export async function insertEngineerRecord(input: Omit<PersistedEngineerRecord, 'id'>) {
+  if (activeProvider === 'mysql') {
+    const [result] = await getMySqlPool().execute<ResultSetHeader>(
+      `
+        INSERT INTO engineers (userId, realName, skillDesc, serviceArea, avgRating, totalOrders, status, avatar)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [input.userId, input.realName, input.skillDesc, input.serviceArea, input.avgRating, input.totalOrders, input.status, input.avatar]
+    );
+
+    return {
+      id: Number(result.insertId),
+      ...input
+    };
+  }
+
+  getSqliteDatabase().run(
     `
       INSERT INTO engineers (userId, realName, skillDesc, serviceArea, avgRating, totalOrders, status, avatar)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -288,10 +532,10 @@ export function insertEngineerRecord(input: Omit<PersistedEngineerRecord, 'id'>)
   );
 
   const engineer: PersistedEngineerRecord = {
-    id: readLastInsertId(),
+    id: readSqliteLastInsertId(),
     ...input
   };
 
-  writeDatabaseToDisk();
+  writeSqliteDatabaseToDisk();
   return engineer;
 }
