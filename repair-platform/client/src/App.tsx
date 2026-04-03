@@ -292,7 +292,27 @@ function HomePage({ currentUser, deviceTypes, repairItems, engineers }: { curren
         <Col xs={24} lg={15}>
           <Card className="glass-card">
             <Title level={3}>{tx('服务流程', 'Service journey')}</Title>
-            <Steps current={4} responsive items={serviceSteps.map((step) => ({ title: t(step) }))} />
+            <div className="journey-step-grid" role="list" aria-label={tx('服务流程', 'Service journey')}>
+              {serviceSteps.map((step, index) => {
+                const isActiveStep = index === serviceSteps.length - 1;
+
+                return (
+                  <div key={step} className={`journey-step-card${isActiveStep ? ' is-active' : ''}`} role="listitem">
+                    <div className="journey-step-badge">{index + 1}</div>
+                    <div className="journey-step-body">
+                      <Text strong className="journey-step-title">
+                        {t(step)}
+                      </Text>
+                      <Text type="secondary" className="journey-step-caption">
+                        {isActiveStep
+                          ? tx('完成服务后确认结果并提交评价', 'Confirm the result and leave a review after service completion')
+                          : tx('按照流程推进，系统会自动同步订单状态', 'Follow the flow and the platform keeps the order status in sync')}
+                      </Text>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </Card>
         </Col>
         <Col xs={24} lg={9}>
@@ -1520,32 +1540,36 @@ function AppContent() {
   return (
     <Layout className="app-shell">
       <Header className="app-header">
-        <div className="page-wrap" style={{ paddingTop: 12, paddingBottom: 12 }}>
-          <Flex justify="space-between" align="center" wrap="wrap" gap={14}>
+        <div className="page-wrap app-header-wrap">
+          <Flex className="app-header-row" justify="space-between" align="center" wrap="wrap" gap={14}>
             <div className="brand">
               <div className="brand-badge">
                 <PhoneOutlined />
               </div>
               {tx('修达达 Repair+ 平台', 'Repair+ / 修达达 Platform')}
             </div>
-            <Flex align="center" gap={14} style={{ flex: 1, minWidth: 340 }}>
-              <Menu mode="horizontal" selectedKeys={[selectedKey]} items={navigationItems} style={{ flex: 1, borderBottom: 'none', background: 'transparent' }} />
-              <Select
-                value={language}
-                onChange={setLanguage}
-                style={{ minWidth: 110 }}
-                options={[
-                  { label: '中文', value: 'zh' },
-                  { label: 'English', value: 'en' }
-                ]}
-              />
-              {currentUser ? (
-                <Space>
-                  <Tag color="blue">{t(getRoleLabel(currentUser.role))}</Tag>
-                  <Text>{t(currentUser.nickname)}</Text>
-                  <Button icon={<LogoutOutlined />} onClick={logout}>{tx('退出', 'Sign out')}</Button>
-                </Space>
-              ) : null}
+            <Flex className="app-header-controls" align="center" gap={14}>
+              <div className="app-nav-shell">
+                <Menu className="app-nav-menu" mode="horizontal" selectedKeys={[selectedKey]} items={navigationItems} style={{ borderBottom: 'none', background: 'transparent' }} />
+              </div>
+              <div className="app-header-tools">
+                <Select
+                  value={language}
+                  onChange={setLanguage}
+                  style={{ minWidth: 110 }}
+                  options={[
+                    { label: '中文', value: 'zh' },
+                    { label: 'English', value: 'en' }
+                  ]}
+                />
+                {currentUser ? (
+                  <Space className="app-user-actions">
+                    <Tag color="blue">{t(getRoleLabel(currentUser.role))}</Tag>
+                    <Text>{t(currentUser.nickname)}</Text>
+                    <Button icon={<LogoutOutlined />} onClick={logout}>{tx('退出', 'Sign out')}</Button>
+                  </Space>
+                ) : null}
+              </div>
             </Flex>
           </Flex>
         </div>
