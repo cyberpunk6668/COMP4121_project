@@ -60,6 +60,7 @@ import {
   testimonials
 } from './data/mock';
 import InteractiveMapPreview from './components/InteractiveMapPreview';
+import AnimatedCharactersLoginPage from './components/ui/animated-characters-login-page';
 import type { AuthUser, DeviceType, Engineer, Order, PaymentMode, PaymentReadiness, RepairItem, UserRole } from './types';
 
 const { Header, Content, Footer } = Layout;
@@ -506,146 +507,7 @@ function ServicesPage({ deviceTypes, repairItems }: { deviceTypes: DeviceType[];
 }
 
 function AuthPage({ onAuthSuccess }: { onAuthSuccess: (token: string, user: AuthUser) => Promise<void> }) {
-  const navigate = useNavigate();
-  const { t, tx } = useLanguage();
-  const [loginForm] = Form.useForm();
-  const [registerForm] = Form.useForm();
-  const [loading, setLoading] = useState(false);
-  const registerRole = Form.useWatch('role', registerForm) as UserRole | undefined;
-
-  const handleLogin = async (values: { phone: string; password: string }) => {
-    setLoading(true);
-    try {
-      const response = await api.post('/auth/login', values);
-      const { token, user } = response.data.data as { token: string; user: AuthUser };
-      await onAuthSuccess(token, user);
-      message.success(tx('登录成功', 'Signed in successfully'));
-      navigate(getDefaultPathByRole(user.role));
-    } catch (error: unknown) {
-      const errorMessage =
-        typeof error === 'object' && error !== null && 'response' in error
-          ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      message.error((errorMessage && t(errorMessage)) || tx('登录失败', 'Sign-in failed'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async (values: Record<string, string>) => {
-    setLoading(true);
-    try {
-      const response = await api.post('/auth/register', values);
-      const { token, user } = response.data.data as { token: string; user: AuthUser };
-      await onAuthSuccess(token, user);
-      message.success(tx('注册成功，已自动登录', 'Registration successful. You are now signed in automatically.'));
-      navigate(getDefaultPathByRole(user.role));
-    } catch (error: unknown) {
-      const errorMessage =
-        typeof error === 'object' && error !== null && 'response' in error
-          ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      message.error((errorMessage && t(errorMessage)) || tx('注册失败', 'Registration failed'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Row gutter={[24, 24]}>
-      <Col xs={24} lg={14}>
-        <Card className="glass-card">
-          <Title level={2}>{tx('登录 / 注册', 'Sign in / Register')}</Title>
-          <Paragraph type="secondary">
-            {tx('注册时可以直接选择身份：客户或工程师。系统会根据你的选择自动进入对应端口，终于不用“先注册后改人生”了。', 'You can choose your role during registration—customer or engineer. The platform then sends you straight to the matching workspace, no identity crisis required.')}
-          </Paragraph>
-          <Tabs
-            items={[
-              {
-                key: 'login',
-                label: tx('登录', 'Sign in'),
-                children: (
-                  <Form form={loginForm} layout="vertical" onFinish={handleLogin}>
-                    <Form.Item name="phone" label={tx('手机号', 'Phone number')} rules={[{ required: true, message: tx('请输入手机号', 'Please enter your phone number') }]}>
-                      <Input placeholder={tx('例如：13800000000', 'Example: 13800000000')} />
-                    </Form.Item>
-                    <Form.Item name="password" label={tx('密码', 'Password')} rules={[{ required: true, message: tx('请输入密码', 'Please enter your password') }]}>
-                      <Password placeholder={tx('请输入密码', 'Enter your password')} />
-                    </Form.Item>
-                    <Button htmlType="submit" type="primary" icon={<LoginOutlined />} loading={loading}>
-                      {tx('登录', 'Sign in')}
-                    </Button>
-                  </Form>
-                )
-              },
-              {
-                key: 'register',
-                label: tx('注册', 'Register'),
-                children: (
-                  <Form form={registerForm} layout="vertical" onFinish={handleRegister}>
-                    <Form.Item name="nickname" label={tx('昵称', 'Nickname')} rules={[{ required: true, message: tx('请输入昵称', 'Please enter a nickname') }]}>
-                      <Input placeholder={tx('请输入昵称', 'Enter a nickname')} />
-                    </Form.Item>
-                    <Form.Item name="phone" label={tx('手机号', 'Phone number')} rules={[{ required: true, message: tx('请输入手机号', 'Please enter your phone number') }]}>
-                      <Input placeholder={tx('请输入手机号', 'Enter your phone number')} />
-                    </Form.Item>
-                    <Form.Item name="password" label={tx('密码', 'Password')} rules={[{ required: true, message: tx('请输入密码', 'Please enter your password') }, { min: 6, message: tx('密码至少 6 位', 'Password must be at least 6 characters') }]}>
-                      <Password placeholder={tx('请输入至少 6 位密码', 'Enter at least 6 characters')} />
-                    </Form.Item>
-                    <Form.Item name="role" label={tx('注册身份', 'Role')} rules={[{ required: true, message: tx('请选择身份', 'Please choose a role') }]} initialValue="customer">
-                      <Select
-                        options={[
-                          { label: tx('客户：下单维修', 'Customer: place repair orders'), value: 'customer' },
-                          { label: tx('工程师：接单维修', 'Engineer: accept and complete jobs'), value: 'engineer' }
-                        ]}
-                      />
-                    </Form.Item>
-                    {registerRole === 'engineer' ? (
-                      <>
-                        <Form.Item name="realName" label={tx('真实姓名', 'Full name')} rules={[{ required: true, message: tx('请输入真实姓名', 'Please enter your full name') }]}>
-                          <Input placeholder={tx('例如：张工', 'Example: Engineer Zhang')} />
-                        </Form.Item>
-                        <Form.Item name="serviceArea" label={tx('服务区域', 'Service area')} rules={[{ required: true, message: tx('请输入服务区域', 'Please enter the service area') }]}>
-                          <Input placeholder={tx('例如：Sydney CBD / Zetland', 'Example: Sydney CBD / Zetland')} />
-                        </Form.Item>
-                        <Form.Item name="skillDesc" label={tx('技能描述', 'Skill summary')} rules={[{ required: true, message: tx('请输入技能描述', 'Please describe your skills') }]}>
-                          <TextArea rows={3} placeholder={tx('例如：擅长手机换屏、主板维修、电池更换', 'Example: Specialised in screen replacement, logic board repair, and battery service')} />
-                        </Form.Item>
-                      </>
-                    ) : null}
-                    <Button htmlType="submit" type="primary" icon={<UserAddOutlined />} loading={loading}>
-                      {tx('注册并登录', 'Register and sign in')}
-                    </Button>
-                  </Form>
-                )
-              }
-            ]}
-          />
-        </Card>
-      </Col>
-      <Col xs={24} lg={10}>
-        <Card className="glass-card">
-          <Title level={4}>{tx('演示账号', 'Demo accounts')}</Title>
-          <List
-            dataSource={[
-              { role: '客户', phone: '13800000000', password: 'demo123' },
-              { role: '工程师', phone: '13900000000', password: 'demo123' },
-              { role: '管理员', phone: '13700000000', password: 'admin123' }
-            ]}
-            renderItem={(item) => (
-              <List.Item>
-                <Descriptions column={1} size="small">
-                  <Descriptions.Item label={tx('身份', 'Role')}>{t(item.role)}</Descriptions.Item>
-                  <Descriptions.Item label={tx('手机号', 'Phone number')}>{item.phone}</Descriptions.Item>
-                  <Descriptions.Item label={tx('密码', 'Password')}>{item.password}</Descriptions.Item>
-                </Descriptions>
-              </List.Item>
-            )}
-          />
-        </Card>
-      </Col>
-    </Row>
-  );
+  return <AnimatedCharactersLoginPage onAuthSuccess={onAuthSuccess} />;
 }
 
 function BookingPage({ currentUser, deviceTypes, repairItems, refreshData }: { currentUser: AuthUser | null; deviceTypes: DeviceType[]; repairItems: RepairItem[]; refreshData: () => Promise<void> }) {

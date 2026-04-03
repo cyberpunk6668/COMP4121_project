@@ -1,4 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
+  --background: 24 100% 99%;
+  --foreground: 220 20% 14%;
+  --primary: 28 100% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 35 82% 95%;
+  --secondary-foreground: 220 20% 14%;
+  --muted: 35 45% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 31 100% 96%;
+  --accent-foreground: 220 20% 14%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 24 18% 89%;
+  --input: 24 18% 89%;
+  --ring: 28 100% 50%;
+  --radius: 1rem;
   color: #1f2937;
   background: #fffaf6;
   font-synthesis: none;
@@ -14,6 +34,7 @@
 body {
   margin: 0;
   min-width: 320px;
+  color: hsl(var(--foreground));
   background:
     radial-gradient(circle at top left, rgba(255, 122, 0, 0.12), transparent 28%),
     linear-gradient(180deg, #fffaf6 0%, #fff 35%, #f7f8fc 100%);
