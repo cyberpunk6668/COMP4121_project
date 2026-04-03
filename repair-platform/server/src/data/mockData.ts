@@ -127,6 +127,10 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+export function normalizePhone(phone: string) {
+  return phone.replace(/\D/g, '');
+}
+
 export function hashPassword(password: string) {
   return createHash('sha256').update(`${password}:${AUTH_SALT}`).digest('hex');
 }
@@ -440,7 +444,8 @@ export function getUserById(id: number) {
 }
 
 export function getUserByPhone(phone: string) {
-  return users.find((user) => user.phone === phone);
+  const normalizedPhone = normalizePhone(phone);
+  return users.find((user) => normalizePhone(user.phone) === normalizedPhone);
 }
 
 export function getEngineerByUserId(userId: number) {
@@ -452,12 +457,14 @@ export function getEngineerById(id: number) {
 }
 
 export async function createUser(input: CreateUserInput) {
-  if (getUserByPhone(input.phone)) {
+  const normalizedPhone = normalizePhone(input.phone);
+
+  if (getUserByPhone(normalizedPhone)) {
     throw new Error('This phone number has already been registered.');
   }
 
   const userData: Omit<User, 'id'> = {
-    phone: input.phone,
+    phone: normalizedPhone,
     nickname: input.nickname,
     role: input.role,
     passwordHash: hashPassword(input.password),

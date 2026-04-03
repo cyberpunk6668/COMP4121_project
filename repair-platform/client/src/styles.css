@@ -34,6 +34,7 @@
 body {
   margin: 0;
   min-width: 320px;
+  overflow-x: hidden;
   color: hsl(var(--foreground));
   background:
     radial-gradient(circle at top left, rgba(255, 122, 0, 0.12), transparent 28%),
@@ -52,18 +53,24 @@ body {
   position: sticky;
   top: 0;
   z-index: 30;
+  height: auto;
+  min-height: 78px;
+  padding-inline: 0;
+  line-height: normal;
   backdrop-filter: blur(18px);
-  background: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.97);
   border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
 }
 
 .app-header-wrap {
-  padding-top: 12px;
-  padding-bottom: 12px;
+  padding-top: 14px;
+  padding-bottom: 14px;
 }
 
 .app-header-row {
   gap: 14px;
+  max-width: 100%;
 }
 
 .app-header-controls {
@@ -77,7 +84,14 @@ body {
   flex: 1 1 420px;
   min-width: 0;
   overflow-x: auto;
-  scrollbar-width: thin;
+  overflow-y: hidden;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  overscroll-behavior: contain;
+}
+
+.app-nav-shell::-webkit-scrollbar {
+  display: none;
 }
 
 .app-nav-menu {
@@ -100,6 +114,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
   font-size: 20px;
   font-weight: 800;
   color: #111827;
@@ -293,7 +308,7 @@ body {
 .page-wrap {
   max-width: 1240px;
   margin: 0 auto;
-  padding: 28px 20px 64px;
+  padding: 40px 20px 64px;
 }
 
 .footer {
@@ -327,6 +342,6 @@ body {
   }
 
   .page-wrap {
-    padding: 20px 14px 48px;
+    padding: 28px 14px 48px;
   }
 }

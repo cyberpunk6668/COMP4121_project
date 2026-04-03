@@ -56,6 +56,10 @@ const demoAccounts = [
   { key: 'admin', role: '管理员', phone: '13700000000', password: 'admin123', icon: ShieldCheck }
 ] as const;
 
+function normalizePhoneInput(value: string) {
+  return value.replace(/\D/g, '').slice(0, 20);
+}
+
 function getDefaultPathByRole(role: UserRole) {
   switch (role) {
     case 'engineer':
@@ -364,7 +368,7 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
 
     try {
       const response = await api.post('/auth/login', {
-        phone: loginPhone.trim(),
+        phone: normalizePhoneInput(loginPhone),
         password: loginPassword
       });
       const { token, user } = response.data.data as { token: string; user: AuthUser };
@@ -400,7 +404,7 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
     try {
       const response = await api.post('/auth/register', {
         nickname: registerForm.nickname.trim(),
-        phone: registerForm.phone.trim(),
+        phone: normalizePhoneInput(registerForm.phone),
         password: registerForm.password,
         role: registerForm.role,
         realName: registerForm.realName.trim(),
@@ -691,9 +695,10 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
                   value={loginPhone}
                   autoComplete="tel"
                   inputMode="tel"
+                  maxLength={20}
                   spellCheck={false}
                   onChange={(event) => {
-                    setLoginPhone(event.target.value);
+                    setLoginPhone(normalizePhoneInput(event.target.value));
                     resetError();
                   }}
                   onFocus={() => setIsTyping(true)}
@@ -783,8 +788,9 @@ function AnimatedCharactersLoginPage({ onAuthSuccess }: AnimatedCharactersLoginP
                     value={registerForm.phone}
                     autoComplete="tel"
                     inputMode="tel"
+                    maxLength={20}
                     spellCheck={false}
-                    onChange={(event) => updateRegisterForm('phone', event.target.value)}
+                    onChange={(event) => updateRegisterForm('phone', normalizePhoneInput(event.target.value))}
                     onFocus={() => setIsTyping(true)}
                     onBlur={() => setIsTyping(false)}
                     required

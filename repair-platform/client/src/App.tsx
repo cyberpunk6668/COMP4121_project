@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type WheelEvent as ReactWheelEvent } from 'react';
 import {
   Alert,
   Avatar,
@@ -183,6 +183,15 @@ function getDefaultPathByRole(role: UserRole) {
     default:
       return '/user';
   }
+}
+
+function getApiErrorStatus(error: unknown) {
+  if (typeof error !== 'object' || error === null || !('response' in error)) {
+    return undefined;
+  }
+
+  const response = (error as { response?: { status?: number } }).response;
+  return typeof response?.status === 'number' ? response.status : undefined;
 }
 
 function AccessDeniedCard({ title, description }: { title: string; description: string }) {
@@ -1410,6 +1419,7 @@ function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
   const { language, setLanguage, t, tx } = useLanguage();
+  const navScrollRef = useRef<HTMLDivElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [authReady, setAuthReady] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
@@ -1434,32 +1444,61 @@ function AppContent() {
   };
 
   const refreshData = async () => {
-    try {
-      setLoading(true);
-      const commonRequests = [api.get('/device-types'), api.get('/repair-items'), api.get('/engineers')];
-      const [deviceTypeRes, repairItemRes, engineerRes] = await Promise.all(commonRequests);
-      setDeviceTypes(deviceTypeRes.data.data);
-      setRepairItems(repairItemRes.data.data);
-      setEngineers(engineerRes.data.data);
+    setLoading(true);
 
-      if (currentUser) {
-        const [ordersResponse, feedbackResponse] = await Promise.all([api.get('/orders'), api.get('/feedback')]);
-        setOrders(ordersResponse.data.data);
-        setFeedbackThreads(feedbackResponse.data.data);
-      } else {
-        setOrders([]);
-        setFeedbackThreads([]);
-      }
-    } catch (error) {
-      if (!currentUser) {
-        message.warning(tx('已加载本地演示数据；如需联调，请先启动后端服务。', 'Loaded local demo data. If you want full integration, please start the backend server first.'));
-      } else {
-        message.error(tx('加载用户数据失败，请重新登录。', 'Failed to load user data. Please sign in again.'));
-        clearSession();
-      }
-    } finally {
-      setLoading(false);
+    const commonResults = await Promise.allSettled([api.get('/device-types'), api.get('/repair-items'), api.get('/engineers')]);
+    const [deviceTypeResult, repairItemResult, engineerResult] = commonResults;
+
+    if (deviceTypeResult.status === 'fulfilled') {
+      setDeviceTypes(deviceTypeResult.value.data.data);
     }
+
+    if (repairItemResult.status === 'fulfilled') {
+      setRepairItems(repairItemResult.value.data.data);
+    }
+
+    if (engineerResult.status === 'fulfilled') {
+      setEngineers(engineerResult.value.data.data);
+    }
+
+    const hasPublicData = commonResults.some((result) => result.status === 'fulfilled');
+
+    if (!currentUser) {
+      if (!hasPublicData) {
+        message.warning(tx('已加载本地演示数据；如需联调，请先启动后端服务。', 'Loaded local demo data. If you want full integration, please start the backend server first.'));
+      }
+      setOrders([]);
+      setFeedbackThreads([]);
+      setLoading(false);
+      return;
+    }
+
+    const privateResults = await Promise.allSettled([api.get('/orders'), api.get('/feedback')]);
+    const [ordersResult, feedbackResult] = privateResults;
+    const hasAuthFailure = privateResults.some(
+      (result) => result.status === 'rejected' && [401, 403].includes(getApiErrorStatus(result.reason) ?? 0)
+    );
+
+    if (hasAuthFailure) {
+      message.error(tx('登录状态已失效，请重新登录。', 'Your sign-in session has expired. Please sign in again.'));
+      clearSession();
+      setLoading(false);
+      return;
+    }
+
+    if (ordersResult.status === 'fulfilled') {
+      setOrders(ordersResult.value.data.data);
+    }
+
+    if (feedbackResult.status === 'fulfilled') {
+      setFeedbackThreads(feedbackResult.value.data.data);
+    }
+
+    if (ordersResult.status === 'rejected' || feedbackResult.status === 'rejected') {
+      message.warning(tx('部分登录后数据加载失败，但你的登录状态已保留。', 'Some signed-in data failed to load, but your session has been kept.'));
+    }
+
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -1537,6 +1576,35 @@ function AppContent() {
     return navigationItems.find((item) => item.key === location.pathname)?.key ?? '/';
   }, [isEngineerOnly, location.pathname, navigationItems]);
 
+  const handleNavWheelScroll = (event: ReactWheelEvent<HTMLDivElement>) => {
+    const navShell = navScrollRef.current;
+    if (!navShell) {
+      return;
+    }
+
+    const canScrollHorizontally = navShell.scrollWidth > navShell.clientWidth + 1;
+    if (!canScrollHorizontally) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+    if (delta === 0) {
+      return;
+    }
+
+    const maxScrollLeft = navShell.scrollWidth - navShell.clientWidth;
+    const nextScrollLeft = Math.min(maxScrollLeft, Math.max(0, navShell.scrollLeft + delta));
+
+    if (nextScrollLeft === navShell.scrollLeft) {
+      return;
+    }
+
+    navShell.scrollLeft = nextScrollLeft;
+  };
+
   return (
     <Layout className="app-shell">
       <Header className="app-header">
@@ -1549,7 +1617,12 @@ function AppContent() {
               {tx('修达达 Repair+ 平台', 'Repair+ / 修达达 Platform')}
             </div>
             <Flex className="app-header-controls" align="center" gap={14}>
-              <div className="app-nav-shell">
+              <div
+                ref={navScrollRef}
+                className="app-nav-shell"
+                onWheel={handleNavWheelScroll}
+                aria-label={tx('页面功能导航', 'Page function navigation')}
+              >
                 <Menu className="app-nav-menu" mode="horizontal" selectedKeys={[selectedKey]} items={navigationItems} style={{ borderBottom: 'none', background: 'transparent' }} />
               </div>
               <div className="app-header-tools">

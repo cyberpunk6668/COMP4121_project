@@ -32,6 +32,7 @@ import {
   Order,
   orders,
   repairItems,
+  normalizePhone,
   sanitizeUser,
   setOrderPaymentQrCode,
   User,
@@ -247,8 +248,14 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
     serviceArea?: string;
   };
 
-  if (!phone || !password || !nickname || !role) {
+  const normalizedPhone = normalizePhone(phone ?? '');
+
+  if (!normalizedPhone || !password || !nickname || !role) {
     return res.status(400).json({ success: false, message: 'Phone, password, nickname, and role are required.' });
+  }
+
+  if (!/^\d{6,20}$/.test(normalizedPhone)) {
+    return res.status(400).json({ success: false, message: 'Phone number format is invalid.' });
   }
 
   if (!['customer', 'engineer'].includes(role)) {
@@ -259,12 +266,12 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
     return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long.' });
   }
 
-  if (getUserByPhone(phone)) {
+  if (getUserByPhone(normalizedPhone)) {
     return res.status(409).json({ success: false, message: 'This phone number has already been registered.' });
   }
 
   try {
-    const user = await createUser({ phone, password, nickname, role: role as 'customer' | 'engineer' });
+    const user = await createUser({ phone: normalizedPhone, password, nickname, role: role as 'customer' | 'engineer' });
 
     if (role === 'engineer') {
       await createEngineerProfile({
@@ -288,11 +295,13 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
 
 app.post('/api/auth/login', (req: Request, res: Response) => {
   const { phone, password } = req.body as { phone?: string; password?: string };
-  if (!phone || !password) {
+  const normalizedPhone = normalizePhone(phone ?? '');
+
+  if (!normalizedPhone || !password) {
     return res.status(400).json({ success: false, message: 'Phone and password are required.' });
   }
 
-  const user = getUserByPhone(phone);
+  const user = getUserByPhone(normalizedPhone);
   if (!user || !verifyPassword(password, user.passwordHash)) {
     return res.status(401).json({ success: false, message: 'Phone or password is incorrect.' });
   }
