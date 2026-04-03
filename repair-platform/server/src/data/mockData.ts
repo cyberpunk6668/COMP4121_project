@@ -1,5 +1,14 @@
 import { createHash } from 'crypto';
 
+import {
+  initializeAuthDatabase,
+  insertEngineerRecord,
+  insertUserRecord,
+  isAuthDatabaseInitialized,
+  loadEngineersFromDatabase,
+  loadUsersFromDatabase
+} from './database';
+
 export type UserRole = 'customer' | 'engineer' | 'admin';
 export type UserStatus = 'active' | 'disabled';
 export type OrderPaymentStatus = '待支付' | '已支付' | '支付失败';
@@ -126,7 +135,7 @@ export function verifyPassword(password: string, passwordHash: string) {
   return hashPassword(password) === passwordHash;
 }
 
-export const users: User[] = [
+const seedUsers: User[] = [
   {
     id: 1,
     phone: '13800000000',
@@ -155,6 +164,8 @@ export const users: User[] = [
     createdAt: '2026-03-01T11:00:00.000Z'
   }
 ];
+
+export const users: User[] = [...seedUsers];
 
 export const deviceTypes: DeviceType[] = [
   { id: 1, name: '手机', icon: '📱', status: 1 },
@@ -344,7 +355,7 @@ export const repairItems: RepairItem[] = [
   }
 ];
 
-export const engineers: Engineer[] = [
+const seedEngineers: Engineer[] = [
   {
     id: 1,
     userId: 2,
@@ -357,6 +368,18 @@ export const engineers: Engineer[] = [
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80'
   }
 ];
+
+export const engineers: Engineer[] = [...seedEngineers];
+
+export async function initializeMockData() {
+  await initializeAuthDatabase({
+    users: seedUsers,
+    engineers: seedEngineers
+  });
+
+  users.splice(0, users.length, ...loadUsersFromDatabase());
+  engineers.splice(0, engineers.length, ...loadEngineersFromDatabase());
+}
 
 export const orders: Order[] = [
   {
@@ -429,8 +452,11 @@ export function getEngineerById(id: number) {
 }
 
 export function createUser(input: CreateUserInput) {
-  const user: User = {
-    id: users.length + 1,
+  if (getUserByPhone(input.phone)) {
+    throw new Error('This phone number has already been registered.');
+  }
+
+  const userData: Omit<User, 'id'> = {
     phone: input.phone,
     nickname: input.nickname,
     role: input.role,
@@ -438,13 +464,25 @@ export function createUser(input: CreateUserInput) {
     status: 'active',
     createdAt: nowIso()
   };
+
+  const user: User = isAuthDatabaseInitialized()
+    ? insertUserRecord(userData)
+    : {
+        id: users.length + 1,
+        ...userData
+      };
+
   users.push(user);
   return user;
 }
 
 export function createEngineerProfile(input: CreateEngineerInput) {
-  const engineer: Engineer = {
-    id: engineers.length + 1,
+  const existingEngineer = getEngineerByUserId(input.userId);
+  if (existingEngineer) {
+    return existingEngineer;
+  }
+
+  const engineerData: Omit<Engineer, 'id'> = {
     userId: input.userId,
     realName: input.realName,
     skillDesc: input.skillDesc,
@@ -454,6 +492,14 @@ export function createEngineerProfile(input: CreateEngineerInput) {
     status: 0,
     avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=400&q=80'
   };
+
+  const engineer: Engineer = isAuthDatabaseInitialized()
+    ? insertEngineerRecord(engineerData)
+    : {
+        id: engineers.length + 1,
+        ...engineerData
+      };
+
   engineers.push(engineer);
   return engineer;
 }

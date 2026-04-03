@@ -4,7 +4,7 @@
 
 - 前端：React 18 + TypeScript + Vite + Ant Design
 - 后端：Node.js + Express + TypeScript
-- 数据层：当前使用内存 Mock 数据，便于快速演示；后续可替换为 MySQL + Redis
+- 数据层：客户与工程师账号信息使用本地 SQLite 持久化存储，订单等演示数据仍使用内存 Mock，便于快速演示
 
 ## 已实现的 MVP 页面与能力
 
@@ -34,7 +34,7 @@ repair-platform/
 
 1. 先验证页面流程和业务闭环是否合理
 2. 先把接口结构、页面结构、角色结构定下来
-3. 后续替换 Mock 数据为真实数据库时成本更低
+3. 先把账号体系落到本地 SQLite，后续再把订单/消息等数据迁移到真实数据库时成本更低
 4. 更容易演示、答辩、继续扩展并推送到 GitHub
 
 ## 本地运行
@@ -53,6 +53,8 @@ repair-platform/
 
 默认地址：`http://localhost:4000`
 
+后端首次启动时会自动在 `repair-platform/server/storage/repair-platform.sqlite` 创建本地数据库文件，用来持久保存客户和工程师账号信息。
+
 ### 3. 启动前端
 
 新开一个终端：
@@ -67,6 +69,7 @@ repair-platform/
 
 - MySQL + Prisma / Sequelize
 - Redis 缓存与会话
+- 把订单、论坛反馈、支付记录也迁移到数据库
 - JWT + RBAC 权限系统完善
 - 高德地图地址选择与附近工程师匹配
 - 支付接口（微信 / 支付宝）

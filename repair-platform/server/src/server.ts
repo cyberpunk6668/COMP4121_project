@@ -25,6 +25,7 @@ import {
   getRepairItemById,
   getUserById,
   getUserByPhone,
+  initializeMockData,
   markOrderAsPaid,
   markOrderAsPendingPayment,
   markOrderPaymentFailed,
@@ -262,19 +263,27 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
     return res.status(409).json({ success: false, message: 'This phone number has already been registered.' });
   }
 
-  const user = createUser({ phone, password, nickname, role: role as 'customer' | 'engineer' });
+  try {
+    const user = createUser({ phone, password, nickname, role: role as 'customer' | 'engineer' });
 
-  if (role === 'engineer') {
-    createEngineerProfile({
-      userId: user.id,
-      realName: realName || nickname,
-      skillDesc: skillDesc || '新入驻工程师，等待完善技能简介。',
-      serviceArea: serviceArea || '待设置服务区域'
-    });
+    if (role === 'engineer') {
+      createEngineerProfile({
+        userId: user.id,
+        realName: realName || nickname,
+        skillDesc: skillDesc || '新入驻工程师，等待完善技能简介。',
+        serviceArea: serviceArea || '待设置服务区域'
+      });
+    }
+
+    const token = issueToken(user);
+    return res.status(201).json({ success: true, data: { token, user: sanitizeUser(user) } });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'This phone number has already been registered.') {
+      return res.status(409).json({ success: false, message: error.message });
+    }
+
+    return res.status(500).json({ success: false, message: 'Failed to create account.' });
   }
-
-  const token = issueToken(user);
-  return res.status(201).json({ success: true, data: { token, user: sanitizeUser(user) } });
 });
 
 app.post('/api/auth/login', (req: Request, res: Response) => {
@@ -754,6 +763,16 @@ app.put('/api/admin/orders/:id/assign', requireAuth(['admin']), (req: Request, r
   return res.json({ success: true, data: presentOrder(order) });
 });
 
-app.listen(PORT, () => {
-  console.log(`Repair platform API listening on http://localhost:${PORT}`);
-});
+async function startServer() {
+  try {
+    await initializeMockData();
+    app.listen(PORT, () => {
+      console.log(`Repair platform API listening on http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to initialize the local account database.', error);
+    process.exit(1);
+  }
+}
+
+void startServer();

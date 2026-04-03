@@ -7,6 +7,8 @@ coverage/
 .env
 server/.env
 client/.env
+server/storage/*.sqlite
+server/storage/*.sqlite-*
 server/certs/*.pem
 server/certs/*.key
 server/certs/*.crt
